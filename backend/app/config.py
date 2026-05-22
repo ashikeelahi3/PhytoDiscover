@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
     REDIS_URL: str
-    WORKSPACE_BASE_PATH: str
+    WORKSPACE_BASE_PATH: str = "/tmp/phytodiscover_workspaces"
     VINA_PATH: str = "/usr/local/bin/vina"
     SECRET_KEY: str
     DEBUG: bool = False
@@ -30,6 +30,18 @@ class Settings(BaseSettings):
         if not v.startswith("/"):
             raise ValueError("WORKSPACE_BASE_PATH must be an absolute path")
         return v.rstrip("/")
+
+    def get_workspace_dir(self) -> Path:
+        """Returns the base workspace directory, creating it if needed."""
+        path = Path(self.WORKSPACE_BASE_PATH)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def job_workspace(self, job_id: str) -> Path:
+        """Returns the workspace path for a specific job, creating it if needed."""
+        path = self.get_workspace_dir() / str(job_id)
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
 
 @lru_cache

@@ -205,6 +205,14 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 in frontend-next/.env.local
 Do not add authentication (no login/password system).
 Do not build ADMET properties — that is the next release.
 
+## Workspace path
+Never hardcode a workspace path anywhere in the codebase.
+Always use get_settings().job_workspace(job_id) to get
+the path for a specific job, and get_settings().get_workspace_dir()
+for the base directory. Both create the directory automatically
+if it does not exist. The base path is set by WORKSPACE_BASE_PATH
+in .env — the only place it should ever be defined.
+
 ## Key rules for Claude Code
 1. Never modify the three scientific pipeline files
 2. Always use SQLAlchemy 2.x mapped_column style (not Column)

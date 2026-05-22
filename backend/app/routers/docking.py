@@ -136,7 +136,7 @@ def dispatch_docking(
 
     # STEP 3 — Pre-generate UUID so pathway can be built before the DB insert
     job_id  = uuid_lib.uuid4()
-    pathway = f"{get_settings().WORKSPACE_BASE_PATH}/{job_id}"
+    pathway = str(get_settings().job_workspace(job_id))
 
     compound_id = body.compound_ids[0] if body.compound_ids else None
 

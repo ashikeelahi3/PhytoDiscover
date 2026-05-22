@@ -79,6 +79,13 @@ async def startup():
     except Exception as e:
         logger.error("Database connection failed: %s", e)
 
+    # Step 3: Verify workspace directory is accessible
+    try:
+        workspace = get_settings().get_workspace_dir()
+        logger.info("Workspace directory ready: %s", workspace)
+    except Exception as e:
+        logger.error("Workspace directory error: %s", e)
+
 
 # ── Health ────────────────────────────────────────────────────────────────────
 @app.get("/api/health", tags=["health"])
