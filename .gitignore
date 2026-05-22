@@ -1,0 +1,44 @@
+# Environment
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+*.log
+
+# Conda / venv
+.conda/
+venv/
+env/
+
+# Node
+frontend-next/node_modules/
+frontend-next/.next/
+frontend-next/.env.local
+node_modules/
+
+# Docker volumes (managed by Docker, not git)
+postgres_data/
+
+# Mac
+.DS_Store
+**/.DS_Store
+
+# Workspaces (runtime job files — can be very large)
+workspaces/
+
+# Logs
+logs/
+
+# IDE
+.vscode/
+.idea/

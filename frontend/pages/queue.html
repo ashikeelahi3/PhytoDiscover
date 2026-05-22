@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Queue — PhytoDiscover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --bg:       #0f1117;
+      --card:     #1a1f2e;
+      --card2:    #212736;
+      --accent:   #14b8a6;
+      --accent-d: #0f9488;
+      --text:     #e2e8f0;
+      --muted:    #8892a4;
+      --border:   #1e2433;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+      --warning:  #f59e0b;
+      --row-alt:  #161b28;
+      --sidebar-w: 220px;
+      --actionbar-h: 64px;
+      --font-ui:   'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: var(--sidebar-w);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 36px;
+      padding-bottom: calc(var(--actionbar-h) + 24px);
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────── */
+    .logo {
+      padding: 0 20px 28px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav { list-style: none; padding: 16px 0; flex: 1; }
+    .nav li a {
+      display: block;
+      padding: 10px 20px;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .nav li a:hover { color: var(--text); background: var(--border); }
+    .nav li a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(20,184,166,0.07);
+    }
+    .nav-step { display: block; font-size: 11px; color: #4a5568; margin-bottom: 2px; font-weight: 400; }
+    .nav li a.active .nav-step { color: var(--accent); opacity: 0.7; }
+
+    .pipeline { padding: 20px 20px 0; border-top: 1px solid var(--border); }
+    .pipeline-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .pipeline-step-label { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+    .pipeline-dots { display: flex; gap: 7px; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); border: 1.5px solid #2a3145; transition: background 0.2s; }
+    .dot.done   { background: var(--accent); border-color: var(--accent); opacity: 0.5; }
+    .dot.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ── Page header ─────────────────────────────────────────── */
+    .page-header { margin-bottom: 24px; }
+    .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; }
+    .page-subtitle { color: var(--muted); font-size: 14px; max-width: 600px; }
+
+    /* ── Two-column layout ───────────────────────────────────── */
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+      align-items: start;
+    }
+    .col-left { display: flex; flex-direction: column; gap: 18px; }
+
+    /* ── Cards ───────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title { font-size: 14px; font-weight: 600; }
+    .card-body  { padding: 20px; }
+
+    /* ── Connection badge ────────────────────────────────────── */
+    .conn-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+      transition: all 0.2s;
+    }
+    .conn-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    .conn-badge.connected    { background: rgba(34,197,94,0.12);   color: var(--success); }
+    .conn-badge.connected::before { background: var(--success); }
+    .conn-badge.connecting   { background: rgba(20,184,166,0.12);  color: var(--accent); }
+    .conn-badge.connecting::before { background: var(--accent); animation: blink 1s infinite; }
+    .conn-badge.disconnected { background: rgba(136,146,164,0.12); color: var(--muted); }
+    .conn-badge.disconnected::before { background: var(--muted); }
+    .conn-badge.failed       { background: rgba(239,68,68,0.12);   color: #f87171; }
+    .conn-badge.failed::before { background: var(--danger); }
+    @keyframes blink { 50% { opacity: 0.3; } }
+
+    /* ── Job meta ────────────────────────────────────────────── */
+    .job-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .meta-item { }
+    .meta-key  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+    .meta-val  { font-size: 13px; font-family: var(--font-mono); color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    /* ── Empty / no-job state ────────────────────────────────── */
+    .no-job-banner {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13.5px;
+      margin-bottom: 4px;
+    }
+    .no-job-banner a { color: var(--accent); }
+
+    /* ── Status timeline ─────────────────────────────────────── */
+    .timeline { display: flex; flex-direction: column; gap: 0; }
+    .timeline-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 0;
+      position: relative;
+    }
+    .timeline-step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 11px;
+      top: 36px;
+      bottom: -14px;
+      width: 2px;
+      background: var(--border);
+    }
+    .timeline-step.ts-done::after   { background: rgba(34,197,94,0.3); }
+    .timeline-step.ts-active::after { background: rgba(20,184,166,0.2); }
+
+    .ts-icon {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: 2px solid #2a3145;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 700;
+      transition: all 0.3s;
+      margin-top: 1px;
+    }
+    .ts-icon.waiting  { border-color: #2a3145; color: #3a4560; }
+    .ts-icon.active   { border-color: var(--accent); background: rgba(20,184,166,0.1); color: var(--accent); animation: pulse-border 1.5s infinite; }
+    .ts-icon.done     { border-color: var(--success); background: rgba(34,197,94,0.1); color: var(--success); }
+    .ts-icon.failed   { border-color: var(--danger);  background: rgba(239,68,68,0.1); color: var(--danger); }
+    @keyframes pulse-border { 50% { box-shadow: 0 0 0 3px rgba(20,184,166,0.15); } }
+
+    .ts-content { flex: 1; min-width: 0; }
+    .ts-label {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: color 0.2s;
+    }
+    .timeline-step.ts-active .ts-label { color: var(--accent); }
+    .timeline-step.ts-done   .ts-label { color: var(--text); }
+    .timeline-step.ts-failed .ts-label { color: #f87171; }
+
+    .ts-desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+    .ts-msg  {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      font-family: var(--font-mono);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .ts-msg.active-msg { color: var(--accent); }
+
+    .spinner-inline {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 2px solid rgba(20,184,166,0.25);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 4px;
+      vertical-align: -1px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Live log ────────────────────────────────────────────── */
+    .log-list {
+      max-height: 220px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-entry {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: var(--bg);
+    }
+    .log-ts    { font-family: var(--font-mono); color: #3a4560; white-space: nowrap; flex-shrink: 0; }
+    .log-badge {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .log-badge.preparing { background: rgba(20,184,166,0.1); color: var(--accent); }
+    .log-badge.docking   { background: rgba(245,158,11,0.1); color: var(--warning); }
+    .log-badge.parsing   { background: rgba(136,146,164,0.1); color: var(--muted); }
+    .log-badge.done      { background: rgba(34,197,94,0.1); color: var(--success); }
+    .log-badge.failed    { background: rgba(239,68,68,0.1); color: #f87171; }
+    .log-badge.pending   { background: rgba(136,146,164,0.1); color: var(--muted); }
+    .log-msg { color: var(--text); flex: 1; }
+    .log-empty { text-align: center; padding: 24px; color: var(--muted); font-size: 13px; }
+
+    /* ── Recent jobs table ───────────────────────────────────── */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: #141927; border-bottom: 1px solid var(--border); }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      white-space: nowrap;
+    }
+    tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #1e2840; }
+    td { padding: 10px 14px; font-size: 13px; vertical-align: middle; }
+    td.td-id { font-family: var(--font-mono); font-size: 12px; color: var(--muted); max-width: 140px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    td.td-date { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+    .cell-dash { color: #3a4560; }
+
+    /* Job status badges */
+    .job-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .job-badge.pending    { background: rgba(136,146,164,0.12); color: var(--muted); }
+    .job-badge.preparing  { background: rgba(20,184,166,0.12);  color: var(--accent); }
+    .job-badge.docking    { background: rgba(245,158,11,0.12);  color: var(--warning); }
+    .job-badge.parsing    { background: rgba(136,146,164,0.12); color: var(--muted); }
+    .job-badge.done       { background: rgba(34,197,94,0.12);   color: var(--success); }
+    .job-badge.failed     { background: rgba(239,68,68,0.12);   color: #f87171; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: #3a4560; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Action bar ──────────────────────────────────────────── */
+    .action-bar {
+      position: fixed;
+      bottom: 0; left: var(--sidebar-w); right: 0;
+      height: var(--actionbar-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      z-index: 200;
+    }
+    .action-info { font-size: 13.5px; color: var(--muted); }
+    .action-info strong { color: var(--accent); }
+    .action-btns { display: flex; gap: 10px; }
+    .btn-lg { padding: 10px 24px; font-size: 14px; }
+    .btn-results { background: var(--accent); color: #fff; border: none; }
+    .btn-results:hover { background: var(--accent-d); }
+
+    /* ── Jobs pagination ─────────────────────────────────────────── */
+    .jobs-pagination {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .jobs-pagination span { font-size: 12px; color: var(--muted); }
+
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">🧪 PhytoDiscover</div>
+  <ul class="nav">
+    <li><a href="search.html"><span class="nav-step">Step 1</span>Search compounds</a></li>
+    <li><a href="smiles.html"><span class="nav-step">Step 2</span>Prepare molecules</a></li>
+    <li><a href="docking.html"><span class="nav-step">Step 3</span>Set up docking</a></li>
+    <li><a href="queue.html" class="active"><span class="nav-step">Step 4</span>Job queue</a></li>
+    <li><a href="results.html"><span class="nav-step">Step 5</span>Results</a></li>
+  </ul>
+  <div class="pipeline">
+    <div class="pipeline-label">Pipeline progress</div>
+    <div class="pipeline-step-label">Step 4 of 5 — Job queue</div>
+    <div class="pipeline-dots">
+      <span class="dot done"   title="Search compounds"></span>
+      <span class="dot done"   title="Prepare molecules"></span>
+      <span class="dot done"   title="Set up docking"></span>
+      <span class="dot active" title="Job queue"></span>
+      <span class="dot"        title="Results"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ─────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <div class="page-header">
+    <h1 class="page-title">Job Queue</h1>
+    <p class="page-subtitle">
+      Monitor your docking job in real time. The pipeline runs protein
+      preparation, docking, and result parsing automatically.
+    </p>
+  </div>
+
+  <div class="cols">
+    <div class="col-left">
+
+      <!-- ── Current job ──────────────────────────────────────── -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Current job</span>
+          <span class="conn-badge disconnected" id="conn-badge">Disconnected</span>
+        </div>
+        <div class="card-body">
+
+          <!-- No job state -->
+          <div class="no-job-banner" id="no-job-banner">
+            No active job. <a href="docking.html">Set up a docking job →</a>
+          </div>
+
+          <!-- Job meta (shown when job_id exists) -->
+          <div id="job-meta" style="display:none;margin-bottom:20px">
+            <div class="job-meta-grid">
+              <div class="meta-item">
+                <div class="meta-key">Job ID</div>
+                <div class="meta-val" id="meta-jobid">—</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-key">Protein</div>
+                <div class="meta-val" id="meta-protein">—</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-key">Compounds</div>
+                <div class="meta-val" id="meta-count">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timeline (shown when job_id exists) -->
+          <div class="timeline" id="timeline" style="display:none">
+            <!-- Rendered by JS -->
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Live log ─────────────────────────────────────────── -->
+      <div class="card" id="log-card" style="display:none">
+        <div class="card-header">
+          <span class="card-title">Live updates</span>
+          <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" id="btn-clear-log">Clear</button>
+        </div>
+        <div class="card-body" style="padding:12px">
+          <div class="log-list" id="log-list">
+            <div class="log-empty">Waiting for updates…</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-left -->
+
+    <!-- Right column: recent jobs -->
+    <div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Recent jobs</span>
+          <button class="btn btn-ghost" style="padding:4px 10px;font-size:12px" id="btn-refresh-jobs">Refresh</button>
+        </div>
+        <div class="table-wrap" style="border-radius:0;border:none">
+          <table>
+            <thead>
+              <tr>
+                <th>Job ID</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="jobs-body">
+              <tr><td colspan="3" style="text-align:center;padding:32px;color:var(--muted)">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="jobs-pagination" id="jobs-pagination">
+          <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px" id="btn-jobs-prev">← Prev</button>
+          <span id="jobs-page-label">Page 1</span>
+          <button class="btn btn-ghost" style="padding:5px 12px;font-size:12px" id="btn-jobs-next">Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /cols -->
+</main>
+
+<!-- ── Action bar ─────────────────────────────────────────────────── -->
+<div class="action-bar">
+  <div class="action-info" id="action-info">
+    Waiting for job to complete…
+  </div>
+  <div class="action-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-back">← New job</button>
+    <button class="btn btn-results btn-lg" id="btn-results" disabled>
+      View results →
+    </button>
+  </div>
+</div>
+
+<script>
+  'use strict';
+
+  const BASE_URL = 'http://localhost:8000';
+  const WS_URL   = 'ws://localhost:8000';
+
+  /* ── Pipeline steps ──────────────────────────────────────────── */
+  const STEPS = [
+    { key: 'preparing', label: 'Protein & ligand preparation',
+      desc: 'Downloading structure, converting to PDBQT' },
+    { key: 'docking',   label: 'Molecular docking',
+      desc: 'Running AutoDock Vina across all ligands' },
+    { key: 'parsing',   label: 'Parsing results',
+      desc: 'Reading binding affinity scores' },
+    { key: 'done',      label: 'Complete',
+      desc: 'All results saved to database' },
+  ];
+
+  // Maps job status → which step index is "active"
+  const STATUS_STEP = {
+    pending:   -1,
+    preparing:  0,
+    docking:    1,
+    parsing:    2,
+    done:       3,
+    failed:     -1,
+  };
+
+  /* ── State ───────────────────────────────────────────────────── */
+  let ws          = null;
+  let currentJobId  = null;
+  let jobDone       = false;
+  let failedStatus  = false;
+  let lastStatus    = 'pending';
+
+  /* ── DOM helpers ─────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString(undefined, {
+        month:'short', day:'numeric', hour:'2-digit', minute:'2-digit',
+      });
+    } catch { return iso; }
+  }
+
+  function fmtTs(ts) {
+    const d = new Date(ts * 1000);
+    return d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+
+  function setConnBadge(state, label) {
+    const b = $('conn-badge');
+    b.className = `conn-badge ${state}`;
+    b.textContent = label;
+  }
+
+  /* ── Timeline render ─────────────────────────────────────────── */
+  function renderTimeline(status, lastMsg) {
+    const activeIdx = STATUS_STEP[status] ?? -1;
+    const isFailed  = status === 'failed';
+
+    const html = STEPS.map((step, i) => {
+      let stepCls  = 'timeline-step';
+      let iconCls  = 'ts-icon waiting';
+      let iconChar = String(i + 1);
+      let msgHtml  = '';
+
+      if (isFailed && i === (activeIdx === -1 ? lastKnownActiveStep() : activeIdx)) {
+        stepCls += ' ts-failed';
+        iconCls  = 'ts-icon failed';
+        iconChar = '✗';
+      } else if (i < activeIdx || status === 'done') {
+        stepCls += ' ts-done';
+        iconCls  = 'ts-icon done';
+        iconChar = '✓';
+      } else if (i === activeIdx) {
+        stepCls += ' ts-active';
+        iconCls  = 'ts-icon active';
+        iconChar = `<span class="spinner-inline"></span>`;
+        if (lastMsg) {
+          msgHtml = `<div class="ts-msg active-msg">${esc(lastMsg)}</div>`;
+        }
+      }
+
+      return `<div class="${stepCls}">
+        <div class="${iconCls}">${iconChar}</div>
+        <div class="ts-content">
+          <div class="ts-label">${step.label}</div>
+          <div class="ts-desc">${step.desc}</div>
+          ${msgHtml}
+        </div>
+      </div>`;
+    }).join('');
+
+    $('timeline').innerHTML = html;
+  }
+
+  function lastKnownActiveStep() {
+    // Fallback: determine from lastStatus which step was running when fail happened
+    const idx = STATUS_STEP[lastStatus];
+    return idx >= 0 ? idx : 0;
+  }
+
+  /* ── Live log ────────────────────────────────────────────────── */
+  let logHasReal = false;
+
+  function appendLog(status, message, ts) {
+    const list = $('log-list');
+    if (!logHasReal) {
+      list.innerHTML = '';
+      logHasReal = true;
+    }
+    const time = ts ? fmtTs(ts) : new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `
+      <span class="log-ts">${time}</span>
+      <span class="log-badge ${esc(status)}">${esc(status)}</span>
+      <span class="log-msg">${esc(message)}</span>`;
+    list.prepend(entry);
+    // keep log under 60 entries
+    while (list.children.length > 60) list.removeChild(list.lastChild);
+  }
+
+  $('btn-clear-log').addEventListener('click', () => {
+    $('log-list').innerHTML = '<div class="log-empty">Log cleared.</div>';
+    logHasReal = false;
+  });
+
+  /* ── Update from status event ────────────────────────────────── */
+  function handleStatusEvent(data) {
+    const { status, message, ts } = data;
+    lastStatus = status;
+
+    renderTimeline(status, message);
+    appendLog(status, message, ts);
+
+    if (status === 'done') {
+      jobDone = true;
+      setConnBadge('connected', 'Complete');
+      $('action-info').innerHTML =
+        'Docking complete. <strong>Results are ready.</strong>';
+      $('btn-results').disabled = false;
+      closeWs();
+    } else if (status === 'failed') {
+      failedStatus = true;
+      setConnBadge('failed', 'Failed');
+      $('action-info').innerHTML =
+        `Job failed: <strong>${esc(message)}</strong>`;
+      closeWs();
+    }
+  }
+
+  /* ── WebSocket ───────────────────────────────────────────────── */
+  function connectWs(jobId) {
+    closeWs();
+    setConnBadge('connecting', 'Connecting…');
+
+    ws = new WebSocket(`${WS_URL}/ws/jobs/${jobId}`);
+
+    ws.onopen = () => {
+      setConnBadge('connected', 'Live');
+    };
+
+    ws.onmessage = ({ data }) => {
+      let parsed;
+      try { parsed = JSON.parse(data); } catch { return; }
+      if (parsed.type === 'ping') return;
+      handleStatusEvent(parsed);
+    };
+
+    ws.onclose = () => {
+      if (!jobDone && !failedStatus) {
+        setConnBadge('disconnected', 'Disconnected');
+        $('action-info').textContent = 'Connection lost. Refresh to reconnect.';
+      }
+      ws = null;
+    };
+
+    ws.onerror = () => {
+      setConnBadge('disconnected', 'Error');
+    };
+  }
+
+  function closeWs() {
+    if (ws) { try { ws.close(); } catch { /* ignore */ } ws = null; }
+  }
+
+  /* ── Fetch current job status from API ───────────────────────── */
+  async function fetchJobStatus(jobId) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/docking/jobs/${jobId}`);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch { return null; }
+  }
+
+  /* ── Init current job ────────────────────────────────────────── */
+  async function initCurrentJob() {
+    currentJobId = sessionStorage.getItem('currentJobId') || null;
+    if (!currentJobId) return;
+
+    // Show job meta
+    $('no-job-banner').style.display = 'none';
+    $('job-meta').style.display = 'block';
+    $('timeline').style.display = 'flex';
+    $('log-card').style.display = 'block';
+
+    $('meta-jobid').textContent   = currentJobId.slice(0, 8) + '…';
+    $('meta-jobid').title         = currentJobId;
+    $('meta-protein').textContent = sessionStorage.getItem('currentJobProtein') || '—';
+    $('meta-count').textContent   = (sessionStorage.getItem('currentJobCount') || '0') + ' compounds';
+
+    // Wire results button
+    $('btn-results').onclick = () => {
+      sessionStorage.setItem('viewJobId', currentJobId);
+      window.location.href = 'results.html';
+    };
+
+    // Fetch current status first
+    renderTimeline('pending', '');
+    const job = await fetchJobStatus(currentJobId);
+    if (job) {
+      lastStatus = job.status;
+      renderTimeline(job.status, job.error_message || '');
+      if (job.status === 'done') {
+        jobDone = true;
+        $('btn-results').disabled = false;
+        setConnBadge('connected', 'Complete');
+        $('action-info').innerHTML = 'Docking complete. <strong>Results are ready.</strong>';
+        appendLog('done', 'Job complete (loaded from database)', Date.now() / 1000);
+        return;  // no WebSocket needed
+      }
+      if (job.status === 'failed') {
+        failedStatus = true;
+        setConnBadge('failed', 'Failed');
+        $('action-info').innerHTML = `Job failed: <strong>${esc(job.error_message || 'unknown error')}</strong>`;
+        appendLog('failed', job.error_message || 'Job failed', Date.now() / 1000);
+        return;
+      }
+    }
+
+    // Live-monitor via WebSocket
+    connectWs(currentJobId);
+    $('action-info').textContent = 'Job running — monitoring live status…';
+  }
+
+  /* ── Recent jobs list ────────────────────────────────────────── */
+  const JOBS_PER_PAGE = 10;
+  let jobsPage = 0;
+
+  async function loadRecentJobs(page) {
+    if (page !== undefined) jobsPage = page;
+    const skip = jobsPage * JOBS_PER_PAGE;
+
+    try {
+      // Fetch one extra to detect whether a next page exists
+      const res = await fetch(
+        `${BASE_URL}/api/docking/jobs?skip=${skip}&limit=${JOBS_PER_PAGE + 1}`
+      );
+      if (!res.ok) throw new Error();
+      const jobs = await res.json();
+
+      const hasNext  = jobs.length > JOBS_PER_PAGE;
+      const pageJobs = jobs.slice(0, JOBS_PER_PAGE);
+
+      if (!pageJobs.length && jobsPage === 0) {
+        $('jobs-body').innerHTML =
+          '<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--muted)">No jobs yet.</td></tr>';
+        $('jobs-pagination').style.display = 'none';
+        return;
+      }
+
+      $('jobs-body').innerHTML = pageJobs.map(j => {
+        const isActive  = j.id === currentJobId;
+        const rowStyle  = isActive ? 'background:rgba(20,184,166,0.06)' : '';
+        const shortId   = j.id.slice(0, 8);
+        const badgeText = j.status === 'failed' ? '✗ Failed' : esc(j.status);
+        return `<tr style="${rowStyle}" data-job-id="${esc(j.id)}" onclick="selectJob('${esc(j.id)}')">
+          <td class="td-id" title="${esc(j.id)}">${shortId}…${isActive ? ' (current)' : ''}</td>
+          <td><span class="job-badge ${esc(j.status)}">${badgeText}</span></td>
+          <td class="td-date">${fmtDate(j.created_at)}</td>
+        </tr>`;
+      }).join('');
+
+      const pg = $('jobs-pagination');
+      pg.style.display          = 'flex';
+      $('jobs-page-label').textContent = `Page ${jobsPage + 1}`;
+      $('btn-jobs-prev').disabled      = jobsPage === 0;
+      $('btn-jobs-next').disabled      = !hasNext;
+
+    } catch {
+      $('jobs-body').innerHTML =
+        '<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--muted)">Could not load jobs.</td></tr>';
+    }
+  }
+
+  function selectJob(jobId) {
+    sessionStorage.setItem('viewJobId', jobId);
+    window.location.href = 'results.html';
+  }
+
+
+  $('btn-refresh-jobs').addEventListener('click', () => loadRecentJobs(0));
+  $('btn-jobs-prev').addEventListener('click',    () => loadRecentJobs(jobsPage - 1));
+  $('btn-jobs-next').addEventListener('click',    () => loadRecentJobs(jobsPage + 1));
+
+  /* ── Navigation ──────────────────────────────────────────────── */
+  $('btn-back').addEventListener('click', () => {
+    closeWs();
+    window.location.href = 'docking.html';
+  });
+
+  window.addEventListener('beforeunload', () => closeWs());
+
+  /* ── Boot ────────────────────────────────────────────────────── */
+  initCurrentJob();
+  loadRecentJobs();
+</script>
+</body>
+</html>

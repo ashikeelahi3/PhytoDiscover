@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Results — PhytoDiscover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --bg:       #0f1117;
+      --card:     #1a1f2e;
+      --card2:    #212736;
+      --accent:   #14b8a6;
+      --accent-d: #0f9488;
+      --text:     #e2e8f0;
+      --muted:    #8892a4;
+      --border:   #1e2433;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+      --warning:  #f59e0b;
+      --row-alt:  #161b28;
+      --sidebar-w: 220px;
+      --actionbar-h: 64px;
+      --font-ui:   'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: var(--sidebar-w);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 36px;
+      padding-bottom: calc(var(--actionbar-h) + 24px);
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────── */
+    .logo {
+      padding: 0 20px 28px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav { list-style: none; padding: 16px 0; flex: 1; }
+    .nav li a {
+      display: block;
+      padding: 10px 20px;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .nav li a:hover { color: var(--text); background: var(--border); }
+    .nav li a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(20,184,166,0.07);
+    }
+    .nav-step { display: block; font-size: 11px; color: #4a5568; margin-bottom: 2px; font-weight: 400; }
+    .nav li a.active .nav-step { color: var(--accent); opacity: 0.7; }
+
+    .pipeline { padding: 20px 20px 0; border-top: 1px solid var(--border); }
+    .pipeline-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .pipeline-step-label { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+    .pipeline-dots { display: flex; gap: 7px; align-items: center; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); border: 1.5px solid #2a3145; transition: background 0.2s; }
+    .dot.done   { background: var(--accent); border-color: var(--accent); opacity: 0.5; }
+    .dot.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ── Error / state banners ───────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+    .info-banner {
+      display: none;
+      background: rgba(20,184,166,0.08);
+      border: 1px solid rgba(20,184,166,0.2);
+      color: var(--accent);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+
+    /* ── Page header ─────────────────────────────────────────── */
+    .page-header { margin-bottom: 24px; }
+    .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; }
+    .page-subtitle { color: var(--muted); font-size: 14px; }
+
+    /* ── Job info strip ──────────────────────────────────────── */
+    .job-strip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .job-strip-item { }
+    .js-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
+    .js-val { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+
+    .job-status-badge {
+      margin-left: auto;
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .job-status-badge.done    { background: rgba(34,197,94,0.12);   color: var(--success); }
+    .job-status-badge.failed  { background: rgba(239,68,68,0.12);   color: #f87171; }
+    .job-status-badge.pending { background: rgba(20,184,166,0.12);  color: var(--accent); }
+
+    /* ── Stats bar ───────────────────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Toolbar ─────────────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+    }
+    .result-count { font-size: 13px; color: var(--muted); }
+    .result-count strong { color: var(--text); }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      overflow-x: auto;
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    thead { background: #141927; border-bottom: 1px solid var(--border); }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.15s;
+    }
+    th:hover { color: var(--text); }
+    th.sorted { color: var(--accent); }
+    th.th-num { text-align: right; }
+    th.th-rank { width: 52px; cursor: default; }
+    th.th-bar { width: 120px; }
+
+    th .sort-arrow { margin-left: 4px; opacity: 0.5; font-size: 10px; }
+    th.sorted .sort-arrow { opacity: 1; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr.row-even { background: var(--card); }
+    tbody tr.row-odd  { background: var(--row-alt); }
+    tbody tr:hover    { background: #1e2840; }
+    tbody tr.score-excellent { border-left: 3px solid rgba(34,197,94,0.5); }
+    tbody tr.score-good      { border-left: 3px solid rgba(20,184,166,0.4); }
+    tbody tr.score-moderate  { border-left: 3px solid transparent; }
+
+    td { padding: 10px 14px; font-size: 13.5px; color: var(--text); vertical-align: middle; }
+    td.td-rank { color: var(--muted); font-family: var(--font-mono); font-size: 12px; text-align: center; }
+    td.td-name { font-weight: 500; max-width: 240px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    td.td-num  { text-align: right; font-family: var(--font-mono); font-size: 13px; }
+
+    .score-val {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .score-val.excellent { color: var(--success); }
+    .score-val.good      { color: var(--accent); }
+    .score-val.moderate  { color: var(--text); }
+    .score-val.weak      { color: var(--muted); }
+
+    /* Score bar */
+    .score-bar-wrap {
+      height: 6px;
+      background: #1e2840;
+      border-radius: 3px;
+      overflow: hidden;
+      min-width: 80px;
+    }
+    .score-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .score-bar.excellent { background: var(--success); }
+    .score-bar.good      { background: var(--accent); }
+    .score-bar.moderate  { background: #4a6080; }
+    .score-bar.weak      { background: #2a3a50; }
+
+    .h-bond-dot {
+      display: inline-block;
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin: 0 1.5px;
+      vertical-align: middle;
+    }
+    .cell-dash { color: #3a4560; }
+
+    /* ── Empty / loading states ──────────────────────────────── */
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 80px 40px;
+    }
+    .empty-icon  { font-size: 48px; margin-bottom: 16px; }
+    .empty-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .empty-desc  { color: var(--muted); font-size: 14px; margin-bottom: 24px; max-width: 420px; margin-inline: auto; }
+
+    .pending-state {
+      display: none;
+      text-align: center;
+      padding: 64px 40px;
+    }
+    .pending-spinner {
+      display: inline-block;
+      width: 36px; height: 36px;
+      border: 3px solid rgba(20,184,166,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .pending-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+    .pending-desc  { color: var(--muted); font-size: 14px; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: #3a4560; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Action bar ──────────────────────────────────────────── */
+    .action-bar {
+      position: fixed;
+      bottom: 0; left: var(--sidebar-w); right: 0;
+      height: var(--actionbar-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      z-index: 200;
+    }
+    .action-info { font-size: 13.5px; color: var(--muted); }
+    .action-info strong { color: var(--accent); }
+    .action-btns { display: flex; gap: 10px; }
+    .btn-lg { padding: 10px 24px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">🧪 PhytoDiscover</div>
+  <ul class="nav">
+    <li><a href="search.html"><span class="nav-step">Step 1</span>Search compounds</a></li>
+    <li><a href="smiles.html"><span class="nav-step">Step 2</span>Prepare molecules</a></li>
+    <li><a href="docking.html"><span class="nav-step">Step 3</span>Set up docking</a></li>
+    <li><a href="queue.html"><span class="nav-step">Step 4</span>Job queue</a></li>
+    <li><a href="results.html" class="active"><span class="nav-step">Step 5</span>Results</a></li>
+  </ul>
+  <div class="pipeline">
+    <div class="pipeline-label">Pipeline progress</div>
+    <div class="pipeline-step-label">Step 5 of 5 — Results</div>
+    <div class="pipeline-dots">
+      <span class="dot done"   title="Search compounds"></span>
+      <span class="dot done"   title="Prepare molecules"></span>
+      <span class="dot done"   title="Set up docking"></span>
+      <span class="dot done"   title="Job queue"></span>
+      <span class="dot active" title="Results"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ─────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <div class="error-banner" id="error-banner"></div>
+  <div class="info-banner"  id="info-banner"></div>
+
+  <!-- No job selected -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">No results to display</div>
+    <div class="empty-desc">
+      Run a docking job first, then come back here to view binding affinity scores.
+    </div>
+    <a href="docking.html" class="btn btn-primary">← Set up docking</a>
+  </div>
+
+  <!-- Job still running -->
+  <div class="pending-state" id="pending-state">
+    <div class="pending-spinner"></div>
+    <div class="pending-title">Job is still running</div>
+    <div class="pending-desc" id="pending-desc">
+      Check the job queue for live status updates.
+    </div>
+    <br><br>
+    <a href="queue.html" class="btn btn-primary">View job queue →</a>
+  </div>
+
+  <!-- Results panel -->
+  <div id="results-panel" style="display:none">
+
+    <div class="page-header">
+      <h1 class="page-title">Binding Affinity Results</h1>
+      <p class="page-subtitle" id="page-subtitle">
+        Docking scores from AutoDock Vina. Lower scores (more negative) indicate stronger predicted binding.
+      </p>
+    </div>
+
+    <!-- Job info strip -->
+    <div class="job-strip" id="job-strip" style="display:none">
+      <div class="job-strip-item">
+        <div class="js-label">Job ID</div>
+        <div class="js-val" id="js-jobid">—</div>
+      </div>
+      <div class="job-strip-item">
+        <div class="js-label">Protein</div>
+        <div class="js-val" id="js-protein">—</div>
+      </div>
+      <div class="job-strip-item">
+        <div class="js-label">Status</div>
+        <span class="job-status-badge done" id="js-status">done</span>
+      </div>
+    </div>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">Total results</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-best">—</div>
+        <div class="stat-label">Best score (kcal/mol)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-avg">—</div>
+        <div class="stat-label">Average score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-hbond">—</div>
+        <div class="stat-label">With ≥ 2 H-bonds</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <span class="result-count" id="result-count"></span>
+      <button class="btn btn-ghost" id="btn-export-csv">⬇ Export CSV</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-rank">#</th>
+            <th onclick="sortBy('compound_name')">
+              Compound name <span class="sort-arrow" id="arrow-compound_name">↕</span>
+            </th>
+            <th class="th-num" onclick="sortBy('binding_score')">
+              Score (kcal/mol) <span class="sort-arrow" id="arrow-binding_score">↓</span>
+            </th>
+            <th class="th-num" onclick="sortBy('rmsd_lower')">
+              RMSD lower <span class="sort-arrow" id="arrow-rmsd_lower">↕</span>
+            </th>
+            <th class="th-num" onclick="sortBy('rmsd_upper')">
+              RMSD upper <span class="sort-arrow" id="arrow-rmsd_upper">↕</span>
+            </th>
+            <th class="th-num" onclick="sortBy('h_bond_count')">
+              H-bonds <span class="sort-arrow" id="arrow-h_bond_count">↕</span>
+            </th>
+            <th class="th-bar">Affinity</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /results-panel -->
+
+</main>
+
+<!-- ── Action bar ─────────────────────────────────────────────────── -->
+<div class="action-bar">
+  <div class="action-info" id="action-info">
+    View binding affinity results.
+  </div>
+  <div class="action-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-back">← Back to queue</button>
+    <button class="btn btn-primary btn-lg" id="btn-new">New search →</button>
+  </div>
+</div>
+
+<script>
+  'use strict';
+
+  const BASE_URL = 'http://localhost:8000';
+
+  /* ── State ───────────────────────────────────────────────────── */
+  let allResults    = [];
+  let sortKey       = 'binding_score';
+  let sortAsc       = true;   // true = ascending (best scores first for binding)
+  let currentJobId  = null;
+
+  /* ── DOM helpers ─────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function showError(msg) {
+    $('error-banner').textContent = `⚠️ ${msg}`;
+    $('error-banner').style.display = 'block';
+  }
+
+  function showInfo(msg) {
+    $('info-banner').textContent = msg;
+    $('info-banner').style.display = 'block';
+  }
+
+  /* ── Score classification ────────────────────────────────────── */
+  function scoreClass(s) {
+    if (s <= -9)  return 'excellent';
+    if (s <= -7)  return 'good';
+    if (s <= -5)  return 'moderate';
+    return 'weak';
+  }
+
+  /* ── Render stats ────────────────────────────────────────────── */
+  function renderStats(results) {
+    if (!results.length) {
+      ['total','best','avg','hbond'].forEach(k => $(`stat-${k}`).textContent = '0');
+      return;
+    }
+    const scores = results.map(r => r.binding_score);
+    const best   = Math.min(...scores);
+    const avg    = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const hbond  = results.filter(r => (r.h_bond_count || 0) >= 2).length;
+
+    $('stat-total').textContent = results.length;
+    $('stat-best').textContent  = best.toFixed(2);
+    $('stat-avg').textContent   = avg.toFixed(2);
+    $('stat-hbond').textContent = hbond;
+
+    $('action-info').innerHTML =
+      `<strong>${results.length}</strong> results — best score: <strong>${best.toFixed(2)} kcal/mol</strong>`;
+  }
+
+  /* ── Render table ────────────────────────────────────────────── */
+  function renderTable(results) {
+    const tbody = $('table-body');
+
+    if (!results.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:48px;color:var(--muted)">No results found for this job.</td></tr>';
+      return;
+    }
+
+    // Best score for bar scaling (most negative)
+    const minScore = Math.min(...results.map(r => r.binding_score));
+    const maxScore = Math.max(...results.map(r => r.binding_score));
+    const range    = Math.abs(minScore - maxScore) || 1;
+
+    // Rank is based on original sort order (binding_score asc), not current sort
+    const rankMap = new Map(
+      [...allResults]
+        .sort((a, b) => a.binding_score - b.binding_score)
+        .map((r, i) => [r.id, i + 1])
+    );
+
+    tbody.innerHTML = results.map((r, i) => {
+      const cls    = scoreClass(r.binding_score);
+      const rowCls = i % 2 === 0 ? 'row-even' : 'row-odd';
+      const rowExtra = cls === 'excellent' ? ' score-excellent' :
+                       cls === 'good'      ? ' score-good' : '';
+
+      // Bar width: larger negative score = wider bar
+      const barPct = Math.min(100, Math.round(
+        (Math.abs(r.binding_score) / Math.abs(minScore || 1)) * 100
+      ));
+
+      const hBondDots = r.h_bond_count > 0
+        ? Array.from({length: Math.min(r.h_bond_count, 8)},
+            () => '<span class="h-bond-dot"></span>').join('')
+        : '<span class="cell-dash">—</span>';
+
+      const rank = rankMap.get(r.id) || (i + 1);
+
+      return `<tr class="${rowCls}${rowExtra}">
+        <td class="td-rank">${rank}</td>
+        <td class="td-name" title="${esc(r.compound_name)}">${esc(r.compound_name)}</td>
+        <td class="td-num">
+          <span class="score-val ${cls}">${Number(r.binding_score).toFixed(2)}</span>
+        </td>
+        <td class="td-num">${r.rmsd_lower != null ? Number(r.rmsd_lower).toFixed(2) : '<span class="cell-dash">—</span>'}</td>
+        <td class="td-num">${r.rmsd_upper != null ? Number(r.rmsd_upper).toFixed(2) : '<span class="cell-dash">—</span>'}</td>
+        <td class="td-num">${hBondDots}</td>
+        <td>
+          <div class="score-bar-wrap">
+            <div class="score-bar ${cls}" style="width:${barPct}%"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    $('result-count').innerHTML =
+      `<strong>${results.length}</strong> result${results.length !== 1 ? 's' : ''}`;
+  }
+
+  /* ── Sorting ─────────────────────────────────────────────────── */
+  function sortBy(key) {
+    if (sortKey === key) {
+      sortAsc = !sortAsc;
+    } else {
+      sortKey = key;
+      // Default: binding_score ascending, others descending
+      sortAsc = key === 'binding_score';
+    }
+
+    // Update arrow indicators
+    document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '↕');
+    const arrow = $(`arrow-${key}`);
+    if (arrow) arrow.textContent = sortAsc ? '↑' : '↓';
+
+    // Update sorted header styling
+    document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+    const sortedTh = document.querySelector(`th[onclick="sortBy('${key}')"]`);
+    if (sortedTh) sortedTh.classList.add('sorted');
+
+    const sorted = [...allResults].sort((a, b) => {
+      const av = a[key], bv = b[key];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'string') return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sortAsc ? av - bv : bv - av;
+    });
+
+    renderTable(sorted);
+  }
+
+  /* ── Export CSV ──────────────────────────────────────────────── */
+  $('btn-export-csv').addEventListener('click', async () => {
+    if (!currentJobId) return;
+    try {
+      const res = await fetch(`${BASE_URL}/api/docking/results/${currentJobId}/csv`);
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = Object.assign(document.createElement('a'), {
+        href: url,
+        download: `results_${currentJobId.slice(0,8)}.csv`,
+      });
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showError('Could not download CSV. Make sure the API is running.');
+    }
+  });
+
+  /* ── Init ────────────────────────────────────────────────────── */
+  async function init() {
+    // Prefer explicit viewJobId (from clicking a job in queue), then currentJobId
+    const jobId = sessionStorage.getItem('viewJobId')
+               || sessionStorage.getItem('currentJobId')
+               || null;
+
+    if (!jobId) {
+      $('empty-state').style.display = 'block';
+      return;
+    }
+
+    currentJobId = jobId;
+
+    // Fetch job metadata
+    let job = null;
+    try {
+      const res = await fetch(`${BASE_URL}/api/docking/jobs/${jobId}`);
+      if (res.ok) job = await res.json();
+    } catch { /* ignore */ }
+
+    if (job) {
+      $('job-strip').style.display = 'flex';
+      $('js-jobid').textContent    = jobId.slice(0, 8) + '…';
+      $('js-jobid').title          = jobId;
+
+      const proteinFromSession = sessionStorage.getItem('currentJobProtein') || '—';
+      $('js-protein').textContent  = proteinFromSession;
+
+      const sb = $('js-status');
+      sb.textContent  = job.status;
+      sb.className    = `job-status-badge ${job.status}`;
+
+      if (job.status === 'failed') {
+        const ps = $('pending-state');
+        ps.style.display = 'block';
+        ps.querySelector('.pending-spinner').style.display = 'none';
+        ps.querySelector('.pending-title').textContent = 'This docking job failed';
+        $('pending-desc').innerHTML =
+          `<span style="color:#f87171">${esc(job.error_message || 'An unknown error occurred.')}</span>` +
+          `<br><br><span style="color:var(--muted);font-size:13px">Common causes: invalid SMILES, ` +
+          `protein download failed, or Vina could not dock the selected compounds.</span>`;
+        return;
+      } else if (['pending','preparing','docking','parsing'].includes(job.status)) {
+        $('pending-state').style.display = 'block';
+        $('pending-desc').textContent =
+          `Job is running — current status: "${job.status}". Results will appear once the job completes.`;
+        return;
+      }
+    }
+
+    // Fetch results
+    try {
+      const res = await fetch(`${BASE_URL}/api/docking/results/${jobId}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          $('empty-state').style.display = 'block';
+        } else {
+          showError(`Could not load results: HTTP ${res.status}`);
+        }
+        return;
+      }
+      allResults = await res.json();
+    } catch {
+      showError('Could not connect to the API. Make sure the server is running at localhost:8000.');
+      return;
+    }
+
+    if (!allResults.length) {
+      $('results-panel').style.display = 'block';
+      showInfo('The job completed but no results were recorded. This may indicate a docking error.');
+      renderStats([]);
+      renderTable([]);
+      return;
+    }
+
+    $('results-panel').style.display = 'block';
+    renderStats(allResults);
+
+    // Initial sort by binding score ascending (best first)
+    const initialSorted = [...allResults].sort((a, b) => a.binding_score - b.binding_score);
+    renderTable(initialSorted);
+
+    // Mark binding_score column as sorted
+    const th = document.querySelector(`th[onclick="sortBy('binding_score')"]`);
+    if (th) th.classList.add('sorted');
+    const arrow = $('arrow-binding_score');
+    if (arrow) arrow.textContent = '↑';
+  }
+
+  /* ── Navigation ──────────────────────────────────────────────── */
+  $('btn-back').addEventListener('click', () => {
+    window.location.href = 'queue.html';
+  });
+  $('btn-new').addEventListener('click', () => {
+    // Clear session so user starts fresh
+    ['selectedCompounds','validatedCompounds','currentJobId',
+     'currentJobProtein','currentJobCount','viewJobId'].forEach(k => {
+      sessionStorage.removeItem(k);
+    });
+    window.location.href = 'search.html';
+  });
+
+  /* ── Boot ────────────────────────────────────────────────────── */
+  init();
+</script>
+</body>
+</html>

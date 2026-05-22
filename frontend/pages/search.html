@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Compounds — PhytoDiscover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --bg:       #0f1117;
+      --card:     #1a1f2e;
+      --card2:    #212736;
+      --accent:   #14b8a6;
+      --accent-d: #0f9488;
+      --text:     #e2e8f0;
+      --muted:    #8892a4;
+      --border:   #1e2433;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+      --row-alt:  #161b28;
+      --sel:      #14b8a618;
+      --sidebar-w: 220px;
+      --actionbar-h: 64px;
+      --font-ui:   'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    /* ── Reset / Base ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+    input, select { font-family: var(--font-ui); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0 24px 0;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: var(--sidebar-w);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 36px;
+      padding-bottom: calc(var(--actionbar-h) + 24px);
+    }
+
+    /* ── Sidebar internals ──────────────────────────────────── */
+    .logo {
+      padding: 0 20px 28px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      list-style: none;
+      padding: 16px 0;
+      flex: 1;
+    }
+    .nav li a {
+      display: block;
+      padding: 10px 20px;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .nav li a:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+    .nav li a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(20, 184, 166, 0.07);
+    }
+    .nav-step {
+      display: block;
+      font-size: 11px;
+      color: #4a5568;
+      margin-bottom: 2px;
+      font-weight: 400;
+    }
+    .nav li a.active .nav-step { color: var(--accent); opacity: 0.7; }
+
+    .pipeline {
+      padding: 20px 20px 0 20px;
+      border-top: 1px solid var(--border);
+    }
+    .pipeline-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .pipeline-step-label {
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .pipeline-dots {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      border: 1.5px solid #2a3145;
+      transition: background 0.2s;
+    }
+    .dot.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ── Error banner ───────────────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 13.5px;
+    }
+
+    /* ── Page header ────────────────────────────────────────── */
+    .page-header { margin-bottom: 28px; }
+    .page-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 600px;
+    }
+
+    /* ── Stats bar ──────────────────────────────────────────── */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: #2a3a4a; }
+    .stat-value {
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 500;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Filter bar ─────────────────────────────────────────── */
+    .filter-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .filter-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      outline: none;
+      transition: border-color 0.15s;
+      min-width: 200px;
+    }
+    .filter-input::placeholder { color: #4a5568; }
+    .filter-input:focus { border-color: var(--accent); }
+
+    /* Toggle switch */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-wrap span {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .toggle {
+      appearance: none;
+      width: 38px; height: 22px;
+      background: #2a3145;
+      border-radius: 11px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      border: none;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      background: #8892a4;
+      border-radius: 50%;
+      top: 3px; left: 3px;
+      transition: left 0.2s, background 0.2s;
+    }
+    .toggle:checked { background: rgba(20,184,166,0.25); }
+    .toggle:checked::after { left: 19px; background: var(--accent); }
+
+    .filter-divider {
+      width: 1px; height: 28px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #3a4560; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Results header ─────────────────────────────────────── */
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .row-count { font-size: 13px; color: var(--muted); }
+
+    /* ── Table ──────────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    thead {
+      background: #141927;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      white-space: nowrap;
+    }
+    th.th-check { width: 44px; text-align: center; padding: 10px 8px; }
+    th.th-num  { text-align: right; }
+    th.th-smiles { width: 180px; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr.row-even { background: var(--card); }
+    tbody tr.row-odd  { background: var(--row-alt); }
+    tbody tr:hover    { background: #1e2840; }
+    tbody tr.row-selected { background: var(--sel) !important; }
+
+    td {
+      padding: 10px 14px;
+      font-size: 13.5px;
+      color: var(--text);
+      vertical-align: middle;
+    }
+    td.td-check { text-align: center; padding: 10px 8px; }
+    td.td-name  { font-weight: 500; max-width: 260px; }
+    td.td-plant { color: var(--muted); max-width: 180px; }
+    td.td-num   { text-align: right; font-family: var(--font-mono); font-size: 13px; }
+    td.td-smiles {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      max-width: 180px;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* Row checkbox */
+    .row-check {
+      width: 16px; height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Drug-like badges */
+    .badge-yes {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(34,197,94,0.12);
+      color: var(--success);
+    }
+    .badge-no {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(136,146,164,0.1);
+      color: #556070;
+    }
+
+    /* Special cells */
+    .empty-cell, .loading-cell {
+      text-align: center;
+      padding: 48px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .cell-dash { color: #3a4560; }
+    .cell-truncate {
+      display: block;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Pagination ─────────────────────────────────────────── */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .page-info { font-size: 13px; color: var(--muted); min-width: 110px; text-align: center; }
+
+    /* ── Action bar ─────────────────────────────────────────── */
+    .action-bar {
+      position: fixed;
+      bottom: 0;
+      left: var(--sidebar-w);
+      right: 0;
+      height: var(--actionbar-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      z-index: 200;
+      backdrop-filter: blur(8px);
+    }
+    .selected-info { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+    .selected-info strong { color: var(--accent); }
+    .action-btns { display: flex; gap: 10px; }
+
+    .btn-lg {
+      padding: 10px 24px;
+      font-size: 14px;
+    }
+    .btn-send {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+    }
+    .btn-send:hover { background: var(--accent-d); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">🧪 PhytoDiscover</div>
+
+  <ul class="nav">
+    <li>
+      <a href="search.html" class="active">
+        <span class="nav-step">Step 1</span>
+        Search compounds
+      </a>
+    </li>
+    <li>
+      <a href="smiles.html">
+        <span class="nav-step">Step 2</span>
+        Prepare molecules
+      </a>
+    </li>
+    <li>
+      <a href="docking.html">
+        <span class="nav-step">Step 3</span>
+        Set up docking
+      </a>
+    </li>
+    <li>
+      <a href="queue.html">
+        <span class="nav-step">Step 4</span>
+        Job queue
+      </a>
+    </li>
+    <li>
+      <a href="results.html">
+        <span class="nav-step">Step 5</span>
+        Results
+      </a>
+    </li>
+  </ul>
+
+  <div class="pipeline">
+    <div class="pipeline-label">Pipeline progress</div>
+    <div class="pipeline-step-label">Step 1 of 5 — Search compounds</div>
+    <div class="pipeline-dots">
+      <span class="dot active" title="Search compounds"></span>
+      <span class="dot" title="Prepare molecules"></span>
+      <span class="dot" title="Set up docking"></span>
+      <span class="dot" title="Job queue"></span>
+      <span class="dot" title="Results"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main content ──────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner">
+    ⚠️ Could not connect to the server. Make sure the API is running at
+    <strong>localhost:8000</strong> and try refreshing.
+  </div>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1 class="page-title">Search Compounds</h1>
+    <p class="page-subtitle">
+      Find plant compounds from our database of 12,663 phytochemicals.
+      Select compounds to send for docking.
+    </p>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Total compounds</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-smiles">—</div>
+      <div class="stat-label">With SMILES</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-lipinski">—</div>
+      <div class="stat-label">Drug-like (Lipinski)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-ready">—</div>
+      <div class="stat-label">Ready to dock</div>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input class="filter-input" id="filter-name"
+           type="text" placeholder="Search by compound name…"
+           autocomplete="off" spellcheck="false">
+
+    <input class="filter-input" id="filter-plant"
+           type="text" placeholder="Filter by plant name…"
+           autocomplete="off" spellcheck="false">
+
+    <div class="filter-divider"></div>
+
+    <label class="toggle-wrap">
+      <input type="checkbox" class="toggle" id="toggle-lipinski">
+      <span>Drug-like only</span>
+    </label>
+
+    <label class="toggle-wrap">
+      <input type="checkbox" class="toggle" id="toggle-smiles">
+      <span>Ready to dock only</span>
+    </label>
+
+    <div class="filter-divider"></div>
+
+    <button class="btn btn-primary" id="btn-search">Search</button>
+    <button class="btn btn-ghost"   id="btn-clear">Clear filters</button>
+  </div>
+
+  <!-- Results header -->
+  <div class="results-header">
+    <span class="row-count" id="row-count">Loading…</span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="th-check">
+            <input type="checkbox" class="row-check" id="select-all"
+                   title="Select all on this page">
+          </th>
+          <th>Compound name</th>
+          <th>Plant source</th>
+          <th class="th-num">MW (g/mol)</th>
+          <th class="th-num">LogP</th>
+          <th>Drug-like</th>
+          <th class="th-smiles">SMILES</th>
+        </tr>
+      </thead>
+      <tbody id="table-body">
+        <tr>
+          <td colspan="7" class="loading-cell">Loading compounds…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination">
+    <button class="btn btn-ghost" id="btn-prev" disabled>← Previous</button>
+    <span class="page-info" id="page-info">Page 1 of 1</span>
+    <button class="btn btn-ghost" id="btn-next" disabled>Next →</button>
+  </div>
+
+</main>
+
+<!-- ── Action bar ─────────────────────────────────────────────── -->
+<div class="action-bar">
+  <div class="selected-info">
+    <strong id="selected-count">0</strong>
+    <span id="selected-label"> compounds selected</span>
+  </div>
+  <div class="action-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-export">⬇ Export CSV</button>
+    <button class="btn btn-send btn-lg" id="btn-dock">Send to docking →</button>
+  </div>
+</div>
+
+<script>
+  'use strict';
+
+  const BASE_URL = 'http://localhost:8000';
+  const PAGE_SIZE = 50;
+
+  /* ── State ─────────────────────────────────────────────────── */
+  let currentPage    = 1;
+  let totalCount     = 0;
+  let pageCompounds  = [];   // compounds on the current page
+  let selected       = new Map();   // id → {id, name, smiles}
+  let debounceTimer  = null;
+
+  /* ── DOM refs ──────────────────────────────────────────────── */
+  const $  = id => document.getElementById(id);
+  const errorBanner   = $('error-banner');
+  const tableBody     = $('table-body');
+  const rowCount      = $('row-count');
+  const pageInfo      = $('page-info');
+  const selectedCount = $('selected-count');
+  const selectAllCb   = $('select-all');
+  const filterName    = $('filter-name');
+  const filterPlant   = $('filter-plant');
+  const toggleLip     = $('toggle-lipinski');
+  const toggleSmi     = $('toggle-smiles');
+
+  /* ── Helpers ───────────────────────────────────────────────── */
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function fmt(val, decimals) {
+    if (val == null) return '<span class="cell-dash">—</span>';
+    return Number(val).toFixed(decimals);
+  }
+
+  function showError() { errorBanner.style.display = 'block'; }
+  function hideError() { errorBanner.style.display = 'none'; }
+
+  function debounce(fn, ms) {
+    return (...args) => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  /* ── Filter params ─────────────────────────────────────────── */
+  function buildParams(page) {
+    const p = new URLSearchParams({
+      skip:  ((page || currentPage) - 1) * PAGE_SIZE,
+      limit: PAGE_SIZE,
+    });
+    const name  = filterName.value.trim();
+    const plant = filterPlant.value.trim();
+    if (name)          p.set('name', name);
+    if (plant)         p.set('source_plant', plant);
+    if (toggleLip.checked) p.set('lipinski_pass', 'true');
+    if (toggleSmi.checked) p.set('has_smiles', 'true');
+    return p;
+  }
+
+  /* ── Stats ─────────────────────────────────────────────────── */
+  async function loadStats() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/compounds/stats`);
+      if (!res.ok) throw new Error('stats failed');
+      const d = await res.json();
+      $('stat-total').textContent    = d.total.toLocaleString();
+      $('stat-smiles').textContent   = d.with_smiles.toLocaleString();
+      $('stat-lipinski').textContent = d.lipinski_pass.toLocaleString();
+      $('stat-ready').textContent    = d.with_smiles.toLocaleString();
+      hideError();
+    } catch {
+      showError();
+    }
+  }
+
+  /* ── Compound search ───────────────────────────────────────── */
+  async function loadCompounds(page) {
+    page = page || 1;
+    currentPage = page;
+    tableBody.innerHTML =
+      '<tr><td colspan="7" class="loading-cell">Loading compounds…</td></tr>';
+
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/compounds/search?${buildParams(page)}`
+      );
+      if (!res.ok) throw new Error('search failed');
+
+      totalCount   = parseInt(res.headers.get('X-Total-Count') || '0', 10);
+      const compounds = await res.json();
+      pageCompounds = compounds;
+
+      renderTable(compounds);
+      renderPagination();
+      hideError();
+    } catch {
+      tableBody.innerHTML =
+        '<tr><td colspan="7" class="loading-cell">' +
+        'Failed to load compounds. Check that the API is running.</td></tr>';
+      rowCount.textContent = '';
+      showError();
+    }
+  }
+
+  /* ── Table render ──────────────────────────────────────────── */
+  function renderTable(compounds) {
+    if (!compounds.length) {
+      tableBody.innerHTML =
+        '<tr><td colspan="7" class="empty-cell">' +
+        'No compounds found. Try different filters.</td></tr>';
+      rowCount.textContent = 'Showing 0 compounds';
+      updateSelectAll();
+      return;
+    }
+
+    const skip  = (currentPage - 1) * PAGE_SIZE;
+    const end   = Math.min(skip + compounds.length, totalCount);
+    rowCount.textContent =
+      `Showing ${(skip + 1).toLocaleString()}–${end.toLocaleString()} ` +
+      `of ${totalCount.toLocaleString()} compounds`;
+
+    tableBody.innerHTML = compounds.map((c, i) => {
+      const checked  = selected.has(c.id);
+      const rowClass = `${i % 2 === 0 ? 'row-even' : 'row-odd'}${checked ? ' row-selected' : ''}`;
+
+      const lipinski = c.lipinski_pass === true
+        ? '<span class="badge-yes">✓ Yes</span>'
+        : '<span class="badge-no">✗ No</span>';
+
+      const smilesRaw     = c.smiles || '';
+      const smilesPreview = smilesRaw.length > 25
+        ? esc(smilesRaw.slice(0, 25)) + '…'
+        : esc(smilesRaw);
+      const smilesTooltip = smilesRaw ? `title="${esc(smilesRaw)}"` : '';
+
+      return `
+        <tr class="${rowClass}" data-idx="${i}" onclick="onRowClick(event,${i})">
+          <td class="td-check" onclick="event.stopPropagation()">
+            <input type="checkbox" class="row-check" data-idx="${i}"
+                   ${checked ? 'checked' : ''}
+                   onchange="onRowCheck(this,${i})">
+          </td>
+          <td class="td-name">${esc(c.name)}</td>
+          <td class="td-plant">${esc(c.source_plant) || '<span class="cell-dash">—</span>'}</td>
+          <td class="td-num">${fmt(c.molecular_weight, 1)}</td>
+          <td class="td-num">${fmt(c.logp, 2)}</td>
+          <td>${lipinski}</td>
+          <td class="td-smiles" ${smilesTooltip}>
+            ${smilesRaw
+              ? `<span class="cell-truncate">${smilesPreview}</span>`
+              : '<span class="cell-dash">—</span>'}
+          </td>
+        </tr>`;
+    }).join('');
+
+    updateSelectAll();
+  }
+
+  /* ── Row interaction ───────────────────────────────────────── */
+  function onRowClick(event, idx) {
+    if (event.target.type === 'checkbox') return;
+    const cb = tableBody.querySelector(`.row-check[data-idx="${idx}"]`);
+    if (cb) { cb.checked = !cb.checked; onRowCheck(cb, idx); }
+  }
+
+  function onRowCheck(cb, idx) {
+    const c   = pageCompounds[idx];
+    const row = cb.closest('tr');
+    if (cb.checked) {
+      selected.set(c.id, { id: c.id, name: c.name, smiles: c.smiles || '' });
+      row.classList.add('row-selected');
+    } else {
+      selected.delete(c.id);
+      row.classList.remove('row-selected');
+    }
+    updateSelectAll();
+    updateActionBar();
+  }
+
+  function updateSelectAll() {
+    const cbs = [...tableBody.querySelectorAll('.row-check')];
+    if (!cbs.length) { selectAllCb.checked = false; selectAllCb.indeterminate = false; return; }
+    const n = cbs.filter(cb => cb.checked).length;
+    selectAllCb.checked = n === cbs.length;
+    selectAllCb.indeterminate = n > 0 && n < cbs.length;
+  }
+
+  selectAllCb.addEventListener('change', () => {
+    tableBody.querySelectorAll('.row-check').forEach((cb, i) => {
+      cb.checked = selectAllCb.checked;
+      onRowCheck(cb, parseInt(cb.dataset.idx, 10));
+    });
+  });
+
+  function updateActionBar() {
+    const n = selected.size;
+    selectedCount.textContent = n.toLocaleString();
+    $('selected-label').textContent =
+      n === 1 ? ' compound selected' : ' compounds selected';
+  }
+
+  /* ── Pagination ─────────────────────────────────────────────── */
+  function renderPagination() {
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+    $('btn-prev').disabled = currentPage <= 1;
+    $('btn-next').disabled = currentPage >= totalPages;
+  }
+
+  $('btn-prev').addEventListener('click', () => {
+    if (currentPage > 1) loadCompounds(currentPage - 1);
+  });
+  $('btn-next').addEventListener('click', () => {
+    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+    if (currentPage < totalPages) loadCompounds(currentPage + 1);
+  });
+
+  /* ── Filter events ──────────────────────────────────────────── */
+  const debouncedSearch = debounce(() => loadCompounds(1), 300);
+  filterName.addEventListener('input', debouncedSearch);
+  filterPlant.addEventListener('input', debouncedSearch);
+  filterName.addEventListener('keydown', e => { if (e.key === 'Enter') loadCompounds(1); });
+  filterPlant.addEventListener('keydown', e => { if (e.key === 'Enter') loadCompounds(1); });
+  toggleLip.addEventListener('change', () => loadCompounds(1));
+  toggleSmi.addEventListener('change', () => loadCompounds(1));
+
+  $('btn-search').addEventListener('click', () => loadCompounds(1));
+  $('btn-clear').addEventListener('click', () => {
+    filterName.value = '';
+    filterPlant.value = '';
+    toggleLip.checked = false;
+    toggleSmi.checked = false;
+    loadCompounds(1);
+  });
+
+  /* ── Export CSV ─────────────────────────────────────────────── */
+  $('btn-export').addEventListener('click', exportCSV);
+
+  async function exportCSV() {
+    // Selected compounds → generate CSV client-side (we have the data)
+    if (selected.size > 0) {
+      const header = 'id,name,smiles';
+      const rows   = [...selected.values()]
+        .map(c => `${c.id},"${c.name.replace(/"/g,'""')}","${(c.smiles||'').replace(/"/g,'""')}"`)
+        .join('\n');
+      downloadBlob(header + '\n' + rows, 'selected_compounds.csv', 'text/csv');
+      return;
+    }
+    // No selection → stream all matching compounds from API
+    try {
+      const res = await fetch(
+        `${BASE_URL}/api/compounds/export/csv?${buildParams(1)
+          .toString()
+          .replace(/skip=\d+&?/, '')
+          .replace(/limit=\d+&?/, '')}`
+      );
+      if (!res.ok) throw new Error('export failed');
+      const blob = await res.blob();
+      downloadBlob(blob, 'phytochemicals.csv', 'text/csv');
+    } catch {
+      showError();
+    }
+  }
+
+  function downloadBlob(data, filename, mime) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    const url  = URL.createObjectURL(blob);
+    const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ── Send to docking ─────────────────────────────────────────── */
+  $('btn-dock').addEventListener('click', sendToDocking);
+
+  function sendToDocking() {
+    if (selected.size === 0) {
+      alert('Please select at least one compound before proceeding.');
+      return;
+    }
+    sessionStorage.setItem(
+      'selectedCompounds',
+      JSON.stringify([...selected.values()])
+    );
+    window.location.href = 'smiles.html';
+  }
+
+  /* ── Init ───────────────────────────────────────────────────── */
+  loadStats();
+  loadCompounds(1);
+</script>
+</body>
+</html>

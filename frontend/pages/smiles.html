@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prepare Molecules — PhytoDiscover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --bg:       #0f1117;
+      --card:     #1a1f2e;
+      --card2:    #212736;
+      --accent:   #14b8a6;
+      --accent-d: #0f9488;
+      --text:     #e2e8f0;
+      --muted:    #8892a4;
+      --border:   #1e2433;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+      --warning:  #f59e0b;
+      --row-alt:  #161b28;
+      --sidebar-w: 220px;
+      --actionbar-h: 64px;
+      --font-ui:   'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    /* ── Reset / Base ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+    input { font-family: var(--font-ui); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0 24px 0;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: var(--sidebar-w);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 36px;
+      padding-bottom: calc(var(--actionbar-h) + 24px);
+    }
+
+    /* ── Sidebar internals ──────────────────────────────────── */
+    .logo {
+      padding: 0 20px 28px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav {
+      list-style: none;
+      padding: 16px 0;
+      flex: 1;
+    }
+    .nav li a {
+      display: block;
+      padding: 10px 20px;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .nav li a:hover {
+      color: var(--text);
+      background: var(--border);
+    }
+    .nav li a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(20, 184, 166, 0.07);
+    }
+    .nav-step {
+      display: block;
+      font-size: 11px;
+      color: #4a5568;
+      margin-bottom: 2px;
+      font-weight: 400;
+    }
+    .nav li a.active .nav-step { color: var(--accent); opacity: 0.7; }
+
+    .pipeline {
+      padding: 20px 20px 0 20px;
+      border-top: 1px solid var(--border);
+    }
+    .pipeline-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .pipeline-step-label {
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .pipeline-dots {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      border: 1.5px solid #2a3145;
+      transition: background 0.2s;
+    }
+    .dot.done   { background: var(--accent); border-color: var(--accent); opacity: 0.5; }
+    .dot.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ── Error banner ───────────────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 13.5px;
+    }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 96px 40px;
+    }
+    .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .empty-state-desc {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 24px;
+      max-width: 400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* ── Page header ────────────────────────────────────────── */
+    .page-header { margin-bottom: 28px; }
+    .page-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.4px;
+    }
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 620px;
+    }
+
+    /* ── Summary cards ──────────────────────────────────────── */
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .summary-value {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1;
+      margin-bottom: 5px;
+      color: var(--muted);
+    }
+    .summary-label {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .summary-card.s-total .summary-value   { color: var(--accent); }
+    .summary-card.s-valid .summary-value   { color: var(--success); }
+    .summary-card.s-invalid .summary-value { color: var(--danger); }
+    .summary-card.s-pending .summary-value { color: var(--muted); }
+
+    /* ── Toolbar ─────────────────────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .toolbar-info {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .toolbar-info strong { color: var(--text); }
+    .toolbar-actions { display: flex; gap: 8px; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #3a4560; }
+    .btn-danger {
+      background: transparent;
+      color: #f87171;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.08); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: -2px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Table ──────────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 860px;
+    }
+    thead {
+      background: #141927;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      white-space: nowrap;
+    }
+    th.th-remove { width: 40px; padding: 10px 8px; }
+    th.th-num    { text-align: right; }
+    th.th-smiles { min-width: 280px; }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background 0.1s;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr.row-even   { background: var(--card); }
+    tbody tr.row-odd    { background: var(--row-alt); }
+    tbody tr.row-valid  { background: rgba(34,197,94,0.035) !important; }
+    tbody tr.row-invalid { background: rgba(239,68,68,0.05) !important; }
+
+    td {
+      padding: 9px 14px;
+      font-size: 13.5px;
+      color: var(--text);
+      vertical-align: middle;
+    }
+    td.td-remove { padding: 9px 8px; text-align: center; }
+    td.td-name   { font-weight: 500; max-width: 200px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    td.td-num    { text-align: right; font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+
+    /* Remove button */
+    .btn-remove {
+      background: transparent;
+      border: none;
+      color: #3a4560;
+      font-size: 17px;
+      line-height: 1;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .btn-remove:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+
+    /* Editable SMILES input */
+    .smiles-input {
+      background: var(--bg);
+      border: 1px solid #2a3145;
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: 5px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .smiles-input::placeholder { color: #3a4560; }
+    .smiles-input:focus { border-color: var(--accent); }
+    .smiles-input.s-valid   { border-color: rgba(34,197,94,0.45); }
+    .smiles-input.s-invalid { border-color: rgba(239,68,68,0.45); }
+
+    /* Status badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-pending  { background: rgba(136,146,164,0.12); color: var(--muted); }
+    .badge-valid    { background: rgba(34,197,94,0.12);   color: var(--success); }
+    .badge-invalid  { background: rgba(239,68,68,0.12);   color: #f87171; }
+    .badge-nosmiles { background: rgba(245,158,11,0.12);  color: var(--warning); }
+
+    /* Drug-like badges */
+    .lip-yes {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 12px; font-weight: 600;
+      background: rgba(34,197,94,0.12); color: var(--success);
+    }
+    .lip-no {
+      display: inline-block; padding: 2px 8px; border-radius: 12px;
+      font-size: 12px; font-weight: 600;
+      background: rgba(136,146,164,0.1); color: #556070;
+    }
+
+    .cell-dash { color: #3a4560; }
+    .empty-row-msg {
+      text-align: center;
+      padding: 56px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .empty-row-msg a { color: var(--accent); }
+
+    /* ── Action bar ─────────────────────────────────────────── */
+    .action-bar {
+      position: fixed;
+      bottom: 0;
+      left: var(--sidebar-w);
+      right: 0;
+      height: var(--actionbar-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      z-index: 200;
+    }
+    .action-info { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+    .action-info strong { color: var(--accent); }
+    .action-btns { display: flex; gap: 10px; }
+    .btn-lg { padding: 10px 24px; font-size: 14px; }
+    .btn-send { background: var(--accent); color: #fff; border: none; }
+    .btn-send:hover { background: var(--accent-d); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">🧪 PhytoDiscover</div>
+
+  <ul class="nav">
+    <li>
+      <a href="search.html">
+        <span class="nav-step">Step 1</span>
+        Search compounds
+      </a>
+    </li>
+    <li>
+      <a href="smiles.html" class="active">
+        <span class="nav-step">Step 2</span>
+        Prepare molecules
+      </a>
+    </li>
+    <li>
+      <a href="docking.html">
+        <span class="nav-step">Step 3</span>
+        Set up docking
+      </a>
+    </li>
+    <li>
+      <a href="queue.html">
+        <span class="nav-step">Step 4</span>
+        Job queue
+      </a>
+    </li>
+    <li>
+      <a href="results.html">
+        <span class="nav-step">Step 5</span>
+        Results
+      </a>
+    </li>
+  </ul>
+
+  <div class="pipeline">
+    <div class="pipeline-label">Pipeline progress</div>
+    <div class="pipeline-step-label">Step 2 of 5 — Prepare molecules</div>
+    <div class="pipeline-dots">
+      <span class="dot done"   title="Search compounds"></span>
+      <span class="dot active" title="Prepare molecules"></span>
+      <span class="dot"        title="Set up docking"></span>
+      <span class="dot"        title="Job queue"></span>
+      <span class="dot"        title="Results"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main content ──────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- Error banner -->
+  <div class="error-banner" id="error-banner">
+    ⚠️ Could not connect to the server. Make sure the API is running at
+    <strong>localhost:8000</strong> and try refreshing.
+  </div>
+
+  <!-- Empty state: no sessionStorage data -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-state-icon">🔍</div>
+    <div class="empty-state-title">No compounds selected</div>
+    <div class="empty-state-desc">
+      Go back to Step 1 and select at least one compound to prepare for docking.
+    </div>
+    <a href="search.html" class="btn btn-primary">← Go to Search</a>
+  </div>
+
+  <!-- Main panel shown when compounds are loaded -->
+  <div id="main-panel" style="display:none">
+
+    <!-- Page header -->
+    <div class="page-header">
+      <h1 class="page-title">Prepare Molecules</h1>
+      <p class="page-subtitle">
+        Validate SMILES strings and review computed molecular properties.
+        You can edit SMILES inline for any compound, then re-validate.
+        Only valid compounds will proceed to docking.
+      </p>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="summary-bar">
+      <div class="summary-card s-total">
+        <div class="summary-value" id="sum-total">0</div>
+        <div class="summary-label">Total compounds</div>
+      </div>
+      <div class="summary-card s-valid">
+        <div class="summary-value" id="sum-valid">—</div>
+        <div class="summary-label">Valid SMILES</div>
+      </div>
+      <div class="summary-card s-invalid">
+        <div class="summary-value" id="sum-invalid">—</div>
+        <div class="summary-label">Invalid SMILES</div>
+      </div>
+      <div class="summary-card s-pending">
+        <div class="summary-value" id="sum-pending">—</div>
+        <div class="summary-label">Not yet validated</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-info">
+        <strong id="count-val">0</strong> compounds loaded from search
+      </div>
+      <div class="toolbar-actions">
+        <button class="btn btn-danger" id="btn-clear-invalid" style="display:none">
+          Remove invalid
+        </button>
+        <button class="btn btn-primary" id="btn-validate">Validate SMILES</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="th-remove"></th>
+            <th>Compound name</th>
+            <th class="th-smiles">SMILES</th>
+            <th>Status</th>
+            <th class="th-num">MW (g/mol)</th>
+            <th class="th-num">LogP</th>
+            <th>Drug-like</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /main-panel -->
+
+</main>
+
+<!-- ── Action bar ─────────────────────────────────────────────── -->
+<div class="action-bar">
+  <div class="action-info" id="action-info">
+    Validate SMILES to continue.
+  </div>
+  <div class="action-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-back">← Back to search</button>
+    <button class="btn btn-send btn-lg" id="btn-continue" disabled>
+      Continue to docking →
+    </button>
+  </div>
+</div>
+
+<script>
+  'use strict';
+
+  const BASE_URL = 'http://localhost:8000';
+
+  /* ── State ──────────────────────────────────────────────────── */
+  // status: 'pending' | 'valid' | 'invalid' | 'no-smiles'
+  let compounds    = [];
+  let isValidating = false;
+
+  /* ── DOM helpers ─────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function showError(msg) {
+    const b = $('error-banner');
+    if (msg) b.innerHTML = `⚠️ ${msg}`;
+    b.style.display = 'block';
+  }
+  function hideError() { $('error-banner').style.display = 'none'; }
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  function fmt(val, d) {
+    if (val == null) return '<span class="cell-dash">—</span>';
+    return Number(val).toFixed(d);
+  }
+
+  /* ── Init ────────────────────────────────────────────────────── */
+  function init() {
+    let stored = null;
+    try {
+      stored = JSON.parse(sessionStorage.getItem('selectedCompounds') || 'null');
+    } catch { /* malformed JSON */ }
+
+    if (!stored || !stored.length) {
+      $('empty-state').style.display = 'block';
+      return;
+    }
+
+    compounds = stored.map(c => ({
+      id:     c.id,
+      name:   c.name,
+      smiles: (c.smiles || '').trim(),
+      status: c.smiles ? 'pending' : 'no-smiles',
+      props:  null,
+    }));
+
+    $('main-panel').style.display = 'block';
+    renderTable();
+    updateSummary();
+  }
+
+  /* ── Render table ────────────────────────────────────────────── */
+  function renderTable() {
+    const tbody = $('table-body');
+
+    if (!compounds.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="empty-row-msg">
+        All compounds removed.
+        <a href="search.html">Go back to search.</a>
+      </td></tr>`;
+      return;
+    }
+
+    const statusBadge = {
+      pending:    '<span class="badge badge-pending">Pending</span>',
+      valid:      '<span class="badge badge-valid">✓ Valid</span>',
+      invalid:    '<span class="badge badge-invalid">✗ Invalid</span>',
+      'no-smiles':'<span class="badge badge-nosmiles">No SMILES</span>',
+    };
+
+    tbody.innerHTML = compounds.map((c, i) => {
+      let rowCls = i % 2 === 0 ? 'row-even' : 'row-odd';
+      if (c.status === 'valid')   rowCls += ' row-valid';
+      if (c.status === 'invalid') rowCls += ' row-invalid';
+
+      const inputCls = c.status === 'valid'   ? 'smiles-input s-valid'
+                     : c.status === 'invalid' ? 'smiles-input s-invalid'
+                     : 'smiles-input';
+
+      const mw   = c.props ? fmt(c.props.molecular_weight, 1) : '<span class="cell-dash">—</span>';
+      const logp = c.props ? fmt(c.props.logp, 2) : '<span class="cell-dash">—</span>';
+      const lip  = c.props == null
+        ? '<span class="cell-dash">—</span>'
+        : c.props.lipinski_pass
+          ? '<span class="lip-yes">✓ Yes</span>'
+          : '<span class="lip-no">✗ No</span>';
+
+      return `<tr class="${rowCls}">
+        <td class="td-remove">
+          <button class="btn-remove" onclick="removeCompound(${i})" title="Remove">×</button>
+        </td>
+        <td class="td-name" title="${esc(c.name)}">${esc(c.name)}</td>
+        <td>
+          <input type="text"
+                 class="${inputCls}"
+                 value="${esc(c.smiles)}"
+                 placeholder="Enter SMILES…"
+                 data-idx="${i}"
+                 onchange="onSmilesChange(this, ${i})"
+                 spellcheck="false"
+                 autocomplete="off">
+        </td>
+        <td>${statusBadge[c.status] || ''}</td>
+        <td class="td-num">${mw}</td>
+        <td class="td-num">${logp}</td>
+        <td>${lip}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  /* ── Summary cards + action bar ─────────────────────────────── */
+  function updateSummary() {
+    const total    = compounds.length;
+    const valid    = compounds.filter(c => c.status === 'valid').length;
+    const invalid  = compounds.filter(c => c.status === 'invalid').length;
+    const pending  = total - valid - invalid;
+
+    $('sum-total').textContent   = total;
+    $('sum-valid').textContent   = valid;
+    $('sum-invalid').textContent = invalid;
+    $('sum-pending').textContent = pending;
+    $('count-val').textContent   = total;
+
+    $('btn-clear-invalid').style.display = invalid > 0 ? '' : 'none';
+
+    const cont  = $('btn-continue');
+    const info  = $('action-info');
+    if (valid > 0) {
+      info.innerHTML = `<strong>${valid}</strong> valid compound${valid !== 1 ? 's' : ''} ready for docking`;
+      cont.disabled = false;
+      cont.textContent = `Send ${valid} to docking →`;
+    } else {
+      info.innerHTML = 'Validate SMILES to continue';
+      cont.disabled = true;
+      cont.textContent = 'Continue to docking →';
+    }
+  }
+
+  /* ── SMILES inline edit ──────────────────────────────────────── */
+  function onSmilesChange(input, idx) {
+    const val = input.value.trim();
+    compounds[idx].smiles = val;
+    compounds[idx].props  = null;
+    // If was valid/invalid, reset to pending so the badge reflects the change
+    if (compounds[idx].status === 'valid' || compounds[idx].status === 'invalid') {
+      compounds[idx].status = val ? 'pending' : 'no-smiles';
+    } else {
+      compounds[idx].status = val ? 'pending' : 'no-smiles';
+    }
+    renderTable();
+    updateSummary();
+  }
+
+  /* ── Remove one compound ─────────────────────────────────────── */
+  function removeCompound(idx) {
+    compounds.splice(idx, 1);
+    renderTable();
+    updateSummary();
+  }
+
+  /* ── Remove all invalid ──────────────────────────────────────── */
+  $('btn-clear-invalid').addEventListener('click', () => {
+    compounds = compounds.filter(c => c.status !== 'invalid');
+    renderTable();
+    updateSummary();
+  });
+
+  /* ── Validate all SMILES ─────────────────────────────────────── */
+  $('btn-validate').addEventListener('click', validateAll);
+
+  async function validateAll() {
+    if (isValidating) return;
+
+    // Collect indices and SMILES of compounds that have a string to validate
+    const indices = [];
+    const smilesList = [];
+    compounds.forEach((c, i) => {
+      if (c.smiles.trim()) { indices.push(i); smilesList.push(c.smiles.trim()); }
+    });
+
+    if (!smilesList.length) {
+      alert('No SMILES to validate. Enter SMILES for your compounds first.');
+      return;
+    }
+
+    isValidating = true;
+    const btn = $('btn-validate');
+    btn.innerHTML = '<span class="spinner"></span>Validating…';
+    btn.disabled  = true;
+    hideError();
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/smiles/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ smiles: smilesList }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const results = await res.json();
+
+      // Map results back by index (parallel arrays)
+      results.forEach((r, ri) => {
+        const idx = indices[ri];
+        if (r.is_valid) {
+          compounds[idx].status = 'valid';
+          compounds[idx].smiles = r.smiles;  // canonical SMILES from RDKit
+          compounds[idx].props  = {
+            molecular_weight: r.molecular_weight,
+            logp:             r.logp,
+            h_bond_donors:    r.h_bond_donors,
+            h_bond_acceptors: r.h_bond_acceptors,
+            tpsa:             r.tpsa,
+            rotatable_bonds:  r.rotatable_bonds,
+            lipinski_pass:    r.lipinski_pass,
+          };
+        } else {
+          compounds[idx].status = 'invalid';
+          compounds[idx].props  = null;
+        }
+      });
+
+      renderTable();
+      updateSummary();
+    } catch (err) {
+      showError(`Validation failed: ${err.message}. Is the API running at localhost:8000?`);
+    } finally {
+      isValidating = false;
+      btn.textContent = 'Re-validate';
+      btn.disabled    = false;
+    }
+  }
+
+  /* ── Navigation ──────────────────────────────────────────────── */
+  $('btn-back').addEventListener('click', () => {
+    window.location.href = 'search.html';
+  });
+
+  $('btn-continue').addEventListener('click', () => {
+    const valid = compounds.filter(c => c.status === 'valid');
+    if (!valid.length) return;
+
+    sessionStorage.setItem('validatedCompounds', JSON.stringify(
+      valid.map(c => ({
+        id:               c.id,
+        name:             c.name,
+        smiles:           c.smiles,
+        molecular_weight: c.props?.molecular_weight ?? null,
+        logp:             c.props?.logp ?? null,
+        lipinski_pass:    c.props?.lipinski_pass ?? null,
+      }))
+    ));
+    window.location.href = 'docking.html';
+  });
+
+  /* ── Boot ────────────────────────────────────────────────────── */
+  init();
+</script>
+</body>
+</html>

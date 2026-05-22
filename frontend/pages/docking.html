@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Set Up Docking — PhytoDiscover</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ── Variables ──────────────────────────────────────────── */
+    :root {
+      --bg:       #0f1117;
+      --card:     #1a1f2e;
+      --card2:    #212736;
+      --accent:   #14b8a6;
+      --accent-d: #0f9488;
+      --text:     #e2e8f0;
+      --muted:    #8892a4;
+      --border:   #1e2433;
+      --danger:   #ef4444;
+      --success:  #22c55e;
+      --warning:  #f59e0b;
+      --sidebar-w: 220px;
+      --actionbar-h: 64px;
+      --font-ui:   'Inter', system-ui, sans-serif;
+      --font-mono: 'IBM Plex Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      overflow: hidden;
+      height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: var(--font-ui); }
+    input, select { font-family: var(--font-ui); }
+
+    /* ── Layout ─────────────────────────────────────────────── */
+    .sidebar {
+      position: fixed;
+      left: 0; top: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px 0;
+      z-index: 200;
+      overflow-y: auto;
+    }
+    .main {
+      margin-left: var(--sidebar-w);
+      height: 100vh;
+      overflow-y: auto;
+      padding: 32px 36px;
+      padding-bottom: calc(var(--actionbar-h) + 24px);
+    }
+
+    /* ── Sidebar ────────────────────────────────────────────── */
+    .logo {
+      padding: 0 20px 28px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.2px;
+      border-bottom: 1px solid var(--border);
+    }
+    .nav { list-style: none; padding: 16px 0; flex: 1; }
+    .nav li a {
+      display: block;
+      padding: 10px 20px;
+      color: var(--muted);
+      font-size: 13.5px;
+      font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .nav li a:hover { color: var(--text); background: var(--border); }
+    .nav li a.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: rgba(20,184,166,0.07);
+    }
+    .nav-step { display: block; font-size: 11px; color: #4a5568; margin-bottom: 2px; font-weight: 400; }
+    .nav li a.active .nav-step { color: var(--accent); opacity: 0.7; }
+    .pipeline {
+      padding: 20px 20px 0;
+      border-top: 1px solid var(--border);
+    }
+    .pipeline-label {
+      font-size: 11px; color: var(--muted); text-transform: uppercase;
+      letter-spacing: 0.8px; margin-bottom: 10px;
+    }
+    .pipeline-step-label { font-size: 12px; color: var(--accent); font-weight: 600; margin-bottom: 10px; }
+    .pipeline-dots { display: flex; gap: 7px; align-items: center; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--border); border: 1.5px solid #2a3145; transition: background 0.2s;
+    }
+    .dot.done   { background: var(--accent); border-color: var(--accent); opacity: 0.5; }
+    .dot.active { background: var(--accent); border-color: var(--accent); }
+
+    /* ── Error / empty state ─────────────────────────────────── */
+    .error-banner {
+      display: none;
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+    .empty-state {
+      display: none;
+      text-align: center;
+      padding: 96px 40px;
+    }
+    .empty-state-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-state-title { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+    .empty-state-desc { color: var(--muted); font-size: 14px; margin-bottom: 24px; max-width: 400px; margin-inline: auto; }
+
+    /* ── Page header ─────────────────────────────────────────── */
+    .page-header { margin-bottom: 28px; }
+    .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 6px; }
+    .page-subtitle { color: var(--muted); font-size: 14px; max-width: 620px; }
+
+    /* ── Two-column layout ───────────────────────────────────── */
+    .cols {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+      align-items: start;
+    }
+    .col-left { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Cards ───────────────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .card-subtitle { font-size: 12.5px; color: var(--muted); }
+    .card-body { padding: 20px; }
+
+    /* ── Form elements ───────────────────────────────────────── */
+    .field { margin-bottom: 16px; }
+    .field:last-child { margin-bottom: 0; }
+    .label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .input-row { display: flex; gap: 8px; align-items: center; }
+    .text-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      outline: none;
+      transition: border-color 0.15s;
+      flex: 1;
+    }
+    .text-input::placeholder { color: #3a4560; }
+    .text-input:focus { border-color: var(--accent); }
+    .text-input:disabled { opacity: 0.5; cursor: not-allowed; }
+    .text-input.mono { font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; }
+
+    select.text-input { cursor: pointer; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      padding: 8px 18px;
+      border-radius: 7px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border: none;
+      transition: background 0.15s, opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-d); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: #3a4560; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-sm { padding: 7px 14px; font-size: 12.5px; }
+
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin-right: 6px;
+      vertical-align: -2px;
+    }
+    .spinner-dark {
+      border-color: rgba(0,0,0,0.15);
+      border-top-color: var(--muted);
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Radio toggle ────────────────────────────────────────── */
+    .radio-group { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
+    .radio-option { display: none; }
+    .radio-label {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      user-select: none;
+      flex: 1;
+      text-align: center;
+    }
+    .radio-label:first-of-type { border-right: 1px solid var(--border); }
+    .radio-option:checked + .radio-label {
+      background: rgba(20,184,166,0.12);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Protein info panel ──────────────────────────────────── */
+    .protein-info {
+      display: none;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .protein-info.visible { display: block; }
+    .protein-info-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+    .protein-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+    .meta-item { }
+    .meta-key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .meta-val {
+      font-size: 13px;
+      color: var(--text);
+      font-family: var(--font-mono);
+    }
+
+    /* ── Grid params display ─────────────────────────────────── */
+    .grid-display {
+      display: none;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .grid-display.visible { display: block; }
+    .grid-display-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    .grid-params-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .grid-param {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 8px 10px;
+    }
+    .grid-param-key { font-size: 10.5px; color: var(--muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .grid-param-val { font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
+
+    /* Active site coord inputs */
+    .coord-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* ── Status badge ────────────────────────────────────────── */
+    .step-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+    .step-badge.done     { background: rgba(34,197,94,0.12);   color: var(--success); }
+    .step-badge.pending  { background: rgba(136,146,164,0.12); color: var(--muted); }
+    .step-badge.loading  { background: rgba(20,184,166,0.12);  color: var(--accent); }
+
+    /* ── Compound list card (right column) ───────────────────── */
+    .compound-chip-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .compound-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .chip-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .chip-name {
+      font-size: 12.5px;
+      color: var(--text);
+      font-weight: 500;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .chip-lip {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .chip-lip.yes { color: var(--success); }
+
+    /* ── Action bar ──────────────────────────────────────────── */
+    .action-bar {
+      position: fixed;
+      bottom: 0; left: var(--sidebar-w); right: 0;
+      height: var(--actionbar-h);
+      background: var(--card);
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 36px;
+      z-index: 200;
+    }
+    .action-info { font-size: 13.5px; color: var(--muted); }
+    .action-info strong { color: var(--accent); }
+    .action-btns { display: flex; gap: 10px; }
+    .btn-lg { padding: 10px 24px; font-size: 14px; }
+    .btn-launch { background: var(--accent); color: #fff; border: none; }
+    .btn-launch:hover { background: var(--accent-d); }
+
+    .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+    /* ── Chain buttons ───────────────────────────────────────────── */
+    .chain-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s, background 0.15s;
+    }
+    .chain-btn:hover { border-color: var(--accent); color: var(--text); }
+    .chain-btn.selected { background: rgba(20,184,166,0.12); border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">🧪 PhytoDiscover</div>
+  <ul class="nav">
+    <li><a href="search.html"><span class="nav-step">Step 1</span>Search compounds</a></li>
+    <li><a href="smiles.html"><span class="nav-step">Step 2</span>Prepare molecules</a></li>
+    <li><a href="docking.html" class="active"><span class="nav-step">Step 3</span>Set up docking</a></li>
+    <li><a href="queue.html"><span class="nav-step">Step 4</span>Job queue</a></li>
+    <li><a href="results.html"><span class="nav-step">Step 5</span>Results</a></li>
+  </ul>
+  <div class="pipeline">
+    <div class="pipeline-label">Pipeline progress</div>
+    <div class="pipeline-step-label">Step 3 of 5 — Set up docking</div>
+    <div class="pipeline-dots">
+      <span class="dot done"   title="Search compounds"></span>
+      <span class="dot done"   title="Prepare molecules"></span>
+      <span class="dot active" title="Set up docking"></span>
+      <span class="dot"        title="Job queue"></span>
+      <span class="dot"        title="Results"></span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ─────────────────────────────────────────────────────── -->
+<main class="main">
+
+  <div class="error-banner" id="error-banner"></div>
+
+  <!-- Empty state: no validated compounds -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-state-icon">⚗️</div>
+    <div class="empty-state-title">No validated compounds</div>
+    <div class="empty-state-desc">
+      Complete Steps 1 and 2 first — search for compounds and validate their SMILES.
+    </div>
+    <a href="smiles.html" class="btn btn-primary">← Go to Prepare molecules</a>
+  </div>
+
+  <!-- Main panel -->
+  <div id="main-panel" style="display:none">
+
+    <div class="page-header">
+      <h1 class="page-title">Set Up Docking</h1>
+      <p class="page-subtitle">
+        Choose a protein target, select a chain, and configure the search grid.
+        Then launch the docking job.
+      </p>
+    </div>
+
+    <div class="cols">
+
+      <!-- Left column -->
+      <div class="col-left">
+
+        <!-- ── 1. Protein target ─────────────────────────────── -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">1 — Protein target</div>
+              <div class="card-subtitle">Enter a PDB ID (4 chars) or AlphaFold accession</div>
+            </div>
+            <span class="step-badge pending" id="badge-protein">Incomplete</span>
+          </div>
+          <div class="card-body">
+            <div class="field">
+              <label class="label" for="protein-input">Protein code</label>
+              <div class="input-row">
+                <input type="text"
+                       id="protein-input"
+                       class="text-input mono"
+                       placeholder="e.g. 1ABC or AF-P12345-F1"
+                       maxlength="40"
+                       autocomplete="off"
+                       spellcheck="false">
+                <button class="btn btn-primary" id="btn-fetch">Fetch</button>
+              </div>
+              <div class="hint" id="protein-hint" style="display:none"></div>
+            </div>
+
+            <!-- Protein info box -->
+            <div class="protein-info" id="protein-info">
+              <div class="protein-info-title" id="protein-title">—</div>
+              <div class="protein-meta-grid" id="protein-meta"></div>
+            </div>
+
+            <!-- Chain selector -->
+            <div class="field" id="chain-field" style="display:none;margin-top:16px">
+              <label class="label">Chain</label>
+              <div id="chain-buttons" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+              <div class="hint" id="chain-hint" style="margin-top:8px">Please select a chain to continue</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── 2. Grid box ───────────────────────────────────── -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">2 — Search grid</div>
+              <div class="card-subtitle">Define the docking search space</div>
+            </div>
+            <span class="step-badge pending" id="badge-grid">Incomplete</span>
+          </div>
+          <div class="card-body">
+
+            <!-- Mode toggle -->
+            <div class="field">
+              <label class="label">Grid mode</label>
+              <div class="radio-group">
+                <input type="radio" name="grid-mode" id="mode-blind" value="blind"
+                       class="radio-option" checked>
+                <label class="radio-label" for="mode-blind">Blind (auto)</label>
+                <input type="radio" name="grid-mode" id="mode-active" value="active_site"
+                       class="radio-option">
+                <label class="radio-label" for="mode-active">Active site</label>
+              </div>
+              <div class="hint">
+                Blind: wraps the entire protein with padding.
+                Active site: you specify the pocket center and radius.
+              </div>
+            </div>
+
+            <!-- Active site coords (hidden unless mode=active_site) -->
+            <div id="active-site-fields" style="display:none">
+              <div class="field">
+                <label class="label">Pocket coordinates (Å)</label>
+                <div class="coord-grid">
+                  <div>
+                    <label class="label" style="font-size:11px;margin-bottom:4px">Center X</label>
+                    <input type="number" class="text-input" id="coord-x" placeholder="0.00" step="0.1">
+                  </div>
+                  <div>
+                    <label class="label" style="font-size:11px;margin-bottom:4px">Center Y</label>
+                    <input type="number" class="text-input" id="coord-y" placeholder="0.00" step="0.1">
+                  </div>
+                  <div>
+                    <label class="label" style="font-size:11px;margin-bottom:4px">Center Z</label>
+                    <input type="number" class="text-input" id="coord-z" placeholder="0.00" step="0.1">
+                  </div>
+                  <div>
+                    <label class="label" style="font-size:11px;margin-bottom:4px">Radius (Å)</label>
+                    <input type="number" class="text-input" id="coord-r" placeholder="15" step="0.5" min="5" max="40">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Compute button -->
+            <div class="field">
+              <button class="btn btn-primary" id="btn-grid" disabled>
+                Compute grid
+              </button>
+            </div>
+
+            <!-- Grid params display -->
+            <div class="grid-display" id="grid-display">
+              <div class="grid-display-title">Grid parameters</div>
+              <div class="grid-params-grid" id="grid-params-grid"></div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- /col-left -->
+
+      <!-- Right column: selected compounds summary -->
+      <div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Compounds</div>
+              <div class="card-subtitle" id="compound-subtitle">0 ready to dock</div>
+            </div>
+            <a href="smiles.html" style="font-size:12px;color:var(--muted)">Edit ↗</a>
+          </div>
+          <div class="card-body" style="padding:12px">
+            <div class="compound-chip-list" id="compound-list"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /cols -->
+  </div><!-- /main-panel -->
+
+</main>
+
+<!-- ── Action bar ─────────────────────────────────────────────────── -->
+<div class="action-bar">
+  <div class="action-info" id="action-info">
+    Configure protein and grid to launch docking.
+  </div>
+  <div class="action-btns">
+    <button class="btn btn-ghost btn-lg" id="btn-back">← Back</button>
+    <button class="btn btn-launch btn-lg" id="btn-launch" disabled>
+      Launch docking →
+    </button>
+  </div>
+</div>
+
+<script>
+  'use strict';
+
+  const BASE_URL = 'http://localhost:8000';
+
+  /* ── State ──────────────────────────────────────────────────── */
+  let compounds   = [];     // from sessionStorage
+  let proteinCode = '';     // uppercase PDB/AF code
+  let selectedChain = '';
+  let gridMode    = 'blind';
+  let gridParams  = null;   // {center_x, center_y, center_z, size_x, size_y, size_z}
+
+  /* ── DOM helpers ─────────────────────────────────────────────── */
+  const $ = id => document.getElementById(id);
+
+  function showError(msg) {
+    const b = $('error-banner');
+    b.textContent = msg ? `⚠️ ${msg}` : '';
+    b.style.display = msg ? 'block' : 'none';
+  }
+
+  function esc(str) {
+    if (str == null) return '';
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  /* ── Init ────────────────────────────────────────────────────── */
+  function init() {
+    let stored = null;
+    try {
+      stored = JSON.parse(sessionStorage.getItem('validatedCompounds') || 'null');
+    } catch { /* ignore */ }
+
+    if (!stored || !stored.length) {
+      $('empty-state').style.display = 'block';
+      return;
+    }
+
+    compounds = stored;
+    $('main-panel').style.display = 'block';
+    renderCompoundList();
+  }
+
+  /* ── Compound list (right column) ───────────────────────────── */
+  function renderCompoundList() {
+    const n = compounds.length;
+    $('compound-subtitle').textContent = `${n} compound${n !== 1 ? 's' : ''} ready to dock`;
+
+    $('compound-list').innerHTML = compounds.map(c => {
+      const lipClass = c.lipinski_pass ? 'chip-lip yes' : 'chip-lip';
+      const lipLabel = c.lipinski_pass ? 'Drug-like' : '';
+      return `<div class="compound-chip">
+        <span class="chip-dot"></span>
+        <span class="chip-name" title="${esc(c.name)}">${esc(c.name)}</span>
+        ${lipLabel ? `<span class="${lipClass}">${lipLabel}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  /* ── Fetch protein ────────────────────────────────────────────── */
+  $('protein-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') fetchProtein();
+  });
+  $('btn-fetch').addEventListener('click', fetchProtein);
+
+  async function fetchProtein() {
+    const code = $('protein-input').value.trim().toUpperCase();
+    if (!code) return;
+
+    const btn = $('btn-fetch');
+    btn.innerHTML = '<span class="spinner"></span>';
+    btn.disabled  = true;
+    $('protein-hint').style.display = 'none';
+    $('protein-info').classList.remove('visible');
+    $('chain-field').style.display = 'none';
+    resetGrid();
+    showError('');
+
+    try {
+      // Fetch protein metadata
+      const res = await fetch(`${BASE_URL}/api/protein/${encodeURIComponent(code)}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const protein = await res.json();
+
+      proteinCode = protein.protein_code;
+
+      // Render protein info
+      const meta = protein.metadata_json || {};
+      $('protein-title').textContent = meta.title || protein.protein_code;
+
+      const source = protein.source === 'PDB' ? 'RCSB PDB' : 'AlphaFold DB';
+      const resolution = meta.resolution ? `${meta.resolution} Å` : '—';
+      const method = meta.method || '—';
+      const organism = meta.organism || '—';
+
+      $('protein-meta').innerHTML = [
+        ['Source',     source],
+        ['Organism',   organism],
+        ['Method',     method],
+        ['Resolution', resolution],
+        ['Chains',     (meta.chains || []).join(', ') || '—'],
+        ['Residues',   meta.residue_count != null ? meta.residue_count : '—'],
+      ].map(([k,v]) => `
+        <div class="meta-item">
+          <div class="meta-key">${k}</div>
+          <div class="meta-val">${esc(String(v))}</div>
+        </div>`).join('');
+
+      $('protein-info').classList.add('visible');
+
+      // Populate chain dropdown from /chains endpoint
+      const chainsRes = await fetch(`${BASE_URL}/api/protein/${encodeURIComponent(code)}/chains`);
+      if (!chainsRes.ok) throw new Error('Could not load chains');
+      const chainsData = await chainsRes.json();
+      const chains = chainsData.chains || [];
+
+      renderChainButtons(chains);
+      selectedChain = '';   // no chain pre-selected — user must click explicitly
+      $('chain-field').style.display = 'block';
+
+      setBadge('protein', 'done', '✓ Loaded');
+      updateGridButton();
+      updateLaunchButton();
+
+    } catch (err) {
+      showError(`Could not fetch protein: ${err.message}`);
+      setBadge('protein', 'pending', 'Incomplete');
+    } finally {
+      btn.textContent = 'Fetch';
+      btn.disabled    = false;
+    }
+  }
+
+  /* ── Chain selection ──────────────────────────────────────────── */
+  function renderChainButtons(chains) {
+    $('chain-buttons').innerHTML = chains.map(ch =>
+      `<button class="chain-btn" data-chain="${esc(ch)}"
+         onclick="selectChain('${esc(ch)}')">${esc(ch)}</button>`
+    ).join('');
+    $('chain-hint').textContent  = 'Please select a chain to continue';
+    $('chain-hint').style.display = 'block';
+  }
+
+  function selectChain(chain) {
+    selectedChain = chain;
+    document.querySelectorAll('.chain-btn').forEach(btn => {
+      btn.classList.toggle('selected', btn.dataset.chain === chain);
+    });
+    $('chain-hint').style.display = 'none';
+    resetGrid();
+    updateGridButton();
+    updateLaunchButton();
+  }
+
+  /* ── Grid mode toggle ─────────────────────────────────────────── */
+  document.querySelectorAll('input[name="grid-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      gridMode = radio.value;
+      $('active-site-fields').style.display = gridMode === 'active_site' ? 'block' : 'none';
+      resetGrid();
+      updateGridButton();
+    });
+  });
+
+  function resetGrid() {
+    gridParams = null;
+    $('grid-display').classList.remove('visible');
+    setBadge('grid', 'pending', 'Incomplete');
+    updateLaunchButton();
+  }
+
+  function updateGridButton() {
+    $('btn-grid').disabled = !(proteinCode && selectedChain);
+  }
+
+  /* ── Compute grid ─────────────────────────────────────────────── */
+  $('btn-grid').addEventListener('click', computeGrid);
+
+  async function computeGrid() {
+    if (!proteinCode || !selectedChain) return;
+
+    const mode = gridMode;
+    const body = { protein_code: proteinCode, chain: selectedChain, mode };
+
+    if (mode === 'active_site') {
+      const x = parseFloat($('coord-x').value);
+      const y = parseFloat($('coord-y').value);
+      const z = parseFloat($('coord-z').value);
+      const r = parseFloat($('coord-r').value);
+      if ([x, y, z, r].some(isNaN)) {
+        showError('Enter all four coordinates (X, Y, Z, Radius) for active site mode.');
+        return;
+      }
+      body.x_coord = x;
+      body.y_coord = y;
+      body.z_coord = z;
+      body.radius  = r;
+    }
+
+    const btn = $('btn-grid');
+    btn.innerHTML = '<span class="spinner"></span>Computing…';
+    btn.disabled  = true;
+    showError('');
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/protein/gridbox`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      gridParams = data.grid_params;
+
+      renderGridParams(gridParams);
+      setBadge('grid', 'done', '✓ Computed');
+      updateLaunchButton();
+    } catch (err) {
+      showError(`Grid computation failed: ${err.message}`);
+    } finally {
+      btn.textContent = 'Re-compute grid';
+      btn.disabled    = false;
+    }
+  }
+
+  function renderGridParams(params) {
+    const labels = {
+      center_x: 'Center X',
+      center_y: 'Center Y',
+      center_z: 'Center Z',
+      size_x:   'Size X',
+      size_y:   'Size Y',
+      size_z:   'Size Z',
+    };
+    $('grid-params-grid').innerHTML = Object.entries(labels).map(([k, label]) => `
+      <div class="grid-param">
+        <div class="grid-param-key">${label}</div>
+        <div class="grid-param-val">${params[k] != null ? Number(params[k]).toFixed(2) : '—'}</div>
+      </div>`).join('');
+    $('grid-display').classList.add('visible');
+  }
+
+  /* ── Launch button state ──────────────────────────────────────── */
+  function updateLaunchButton() {
+    const ready = !!(proteinCode && selectedChain && gridParams && compounds.length);
+    $('btn-launch').disabled = !ready;
+
+    if (ready) {
+      $('action-info').innerHTML =
+        `Ready: <strong>${compounds.length}</strong> compound${compounds.length !== 1 ? 's' : ''} → <strong>${proteinCode}</strong> chain <strong>${selectedChain}</strong>`;
+    } else {
+      $('action-info').textContent = 'Configure protein and grid to launch docking.';
+    }
+  }
+
+  /* ── Badge helper ─────────────────────────────────────────────── */
+  function setBadge(name, cls, text) {
+    const el = $(`badge-${name}`);
+    el.className = `step-badge ${cls}`;
+    el.textContent = text;
+  }
+
+  /* ── Launch docking ───────────────────────────────────────────── */
+  $('btn-launch').addEventListener('click', launchDocking);
+
+  async function launchDocking() {
+    const chain = selectedChain;
+    if (!proteinCode || !chain || !gridParams || !compounds.length) return;
+
+    const btn = $('btn-launch');
+    btn.innerHTML = '<span class="spinner"></span>Launching…';
+    btn.disabled  = true;
+    showError('');
+
+    const payload = {
+      protein_code:  proteinCode,
+      chain:         chain,
+      compound_ids:  compounds.map(c => c.id),
+      smiles_list:   [],
+      plant_name:    null,
+      grid_mode:     gridMode,
+      grid_params:   gridParams,
+    };
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/docking/dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        const msg = data.message || data.detail || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      sessionStorage.setItem('currentJobId',      data.job_id);
+      sessionStorage.setItem('currentJobProtein', proteinCode);
+      sessionStorage.setItem('currentJobCount',   String(compounds.length));
+      $('action-info').innerHTML =
+        `Docking job started for <strong>${compounds.length}</strong> compound${compounds.length !== 1 ? 's' : ''} against <strong>${proteinCode}</strong>`;
+      btn.textContent = '✓ Launched — redirecting…';
+      setTimeout(() => { window.location.href = 'queue.html'; }, 700);
+
+    } catch (err) {
+      showError(`Launch failed: ${err.message}`);
+      btn.textContent = 'Launch docking →';
+      btn.disabled    = false;
+    }
+  }
+
+  /* ── Back ─────────────────────────────────────────────────────── */
+  $('btn-back').addEventListener('click', () => {
+    window.location.href = 'smiles.html';
+  });
+
+  /* ── Boot ─────────────────────────────────────────────────────── */
+  init();
+</script>
+</body>
+</html>
