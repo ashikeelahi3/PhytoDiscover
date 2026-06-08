@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   BarChart,
   Bar,
@@ -12,9 +12,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { getJob, getResults, getResultsCsvUrl, getPoseFile } from "@/lib/api";
-import type { Result } from "@/lib/types";
-import { Button } from "@/components/ui/Button";
+import { getJobs, getJob, getResults, getResultsCsvUrl, getPoseFile } from "@/lib/api";
+import type { DockingJob, Result } from "@/lib/types";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/Badge";
 import { ProteinViewer } from "@/components/ProteinViewer";
@@ -34,29 +33,13 @@ function scoreStrength(score: number | null): ScoreStrength {
   return "Weak";
 }
 
-const STRENGTH_CLS: Record<ScoreStrength, string> = {
-  Strong: "bg-green-500/12 text-green-400",
-  Moderate: "bg-amber-500/12 text-amber-400",
-  Weak: "bg-[#64748b]/12 text-[#475569]",
-  Unknown: "bg-[#64748b]/12 text-[#64748b]",
+const STRENGTH_STYLE: Record<ScoreStrength, { bg: string; color: string }> = {
+  Strong:   { bg: "rgba(74,222,128,0.12)",  color: "#4ade80" },
+  Moderate: { bg: "rgba(251,191,36,0.12)",  color: "#fbbf24" },
+  Weak:     { bg: "rgba(100,116,139,0.12)", color: "#64748b" },
+  Unknown:  { bg: "rgba(100,116,139,0.12)", color: "#64748b" },
 };
 
-function AffinityBar({ score }: { score: number | null }) {
-  if (score == null) return <span className="text-[#3a4560]">—</span>;
-  const pct = Math.min(100, Math.max(0, (Math.abs(score) / 12) * 100));
-  const color =
-    score <= -9 ? "bg-green-400" : score <= -7 ? "bg-amber-400" : "bg-[#475569]";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-16 h-1.5 bg-[#1e2433] rounded-full overflow-hidden">
-        <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="font-mono text-xs text-[#94a3b8]">{fmt(score, 1)}</span>
-    </div>
-  );
-}
-
-// Bar colour: teal when selected, otherwise score-range colour
 function barFill(rawScore: number | null, selected: boolean): string {
   if (selected) return "#14b8a6";
   if (rawScore == null) return "#475569";
@@ -69,93 +52,17 @@ type SortKey = "rank" | "name" | "score" | "rmsd_lower" | "rmsd_upper" | "h_bond
 type SortDir = "asc" | "desc";
 type ViewMode = "cartoon" | "surface" | "stick";
 
-function SortTh({
-  label,
-  col,
-  sort,
-  dir,
-  onClick,
-  right,
-}: {
-  label: string;
-  col: SortKey;
-  sort: SortKey;
-  dir: SortDir;
-  onClick: (c: SortKey) => void;
-  right?: boolean;
-}) {
-  const active = sort === col;
-  return (
-    <th
-      className={`px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider cursor-pointer select-none hover:text-[#f1f5f9] transition-colors whitespace-nowrap ${
-        right ? "text-right" : "text-left"
-      } ${active ? "text-[#14b8a6]" : "text-[#64748b]"}`}
-      onClick={() => onClick(col)}
-    >
-      {label}{" "}
-      <span className="font-mono text-[9px]">
-        {active ? (dir === "asc" ? "▲" : "▼") : "⇅"}
-      </span>
-    </th>
-  );
+function relativeTime(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
 }
 
-// ── CompoundInfo sub-panel ────────────────────────────────────────────────────
-
-function CompoundInfo({ result }: { result: Result & { rank: number } }) {
-  const strength = scoreStrength(result.binding_score);
-  return (
-    <div className="bg-[#161b27] border border-[#1e2433] rounded-lg p-4 space-y-3">
-      <div>
-        <p className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider mb-1">
-          Selected compound
-        </p>
-        <p
-          className="text-sm font-semibold text-[#f1f5f9] leading-snug"
-          title={result.compound_name}
-        >
-          {result.compound_name}
-        </p>
-        <p className="text-xs text-[#64748b] mt-0.5">Rank #{result.rank}</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {/* Binding score */}
-        <div className="col-span-2 flex items-center justify-between bg-[#0f1117] border border-[#1e2433] rounded p-2.5">
-          <span className="text-[10px] text-[#64748b] uppercase tracking-wide">
-            Binding score
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm font-medium text-[#f1f5f9]">
-              {fmt(result.binding_score, 1)} kcal/mol
-            </span>
-            <span
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${STRENGTH_CLS[strength]}`}
-            >
-              {strength}
-            </span>
-          </div>
-        </div>
-
-        {[
-          { label: "RMSD lower", value: fmt(result.rmsd_lower, 2) },
-          { label: "RMSD upper", value: fmt(result.rmsd_upper, 2) },
-          { label: "H-bonds", value: result.h_bond_count ?? "—" },
-          { label: "Pose file", value: result.pose_file ? "Available" : "None" },
-        ].map(({ label, value }) => (
-          <div key={label} className="bg-[#0f1117] border border-[#1e2433] rounded p-2">
-            <p className="text-[9px] text-[#64748b] uppercase tracking-wide mb-0.5">
-              {label}
-            </p>
-            <p className="font-mono text-xs text-[#94a3b8]">{String(value)}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Custom tooltip for chart ──────────────────────────────────────────────────
+// ── ChartTooltip ──────────────────────────────────────────────────────────────
 
 function ChartTooltip({
   active,
@@ -167,88 +74,183 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-[#161b27] border border-[#1e2433] rounded px-3 py-2 text-xs shadow-lg">
-      <p className="text-[#f1f5f9] font-medium mb-0.5 max-w-[200px]">{d.name}</p>
-      <p className="font-mono text-[#14b8a6]">
+    <div
+      className="rounded px-3 py-2 text-xs shadow-lg"
+      style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)" }}
+    >
+      <p className="font-medium mb-0.5 max-w-[200px]" style={{ color: "var(--text-primary)" }}>
+        {d.name}
+      </p>
+      <p className="font-mono" style={{ color: "#14b8a6" }}>
         {fmt(d.rawScore, 1)} kcal/mol
       </p>
     </div>
   );
 }
 
-// ── Inner page (reads searchParams) ──────────────────────────────────────────
+// ── SortTh ────────────────────────────────────────────────────────────────────
 
-function ResultsInner() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const jobId = searchParams.get("job_id") ?? "";
+function SortTh({
+  label, col, sort, dir, onClick, right,
+}: {
+  label: string; col: SortKey; sort: SortKey; dir: SortDir;
+  onClick: (c: SortKey) => void; right?: boolean;
+}) {
+  const active = sort === col;
+  return (
+    <th
+      className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider cursor-pointer select-none whitespace-nowrap"
+      style={{
+        textAlign: right ? "right" : "left",
+        color: active ? "#14b8a6" : "var(--text-muted)",
+      }}
+      onClick={() => onClick(col)}
+    >
+      {label}{" "}
+      <span className="font-mono text-[9px]">
+        {active ? (dir === "asc" ? "▲" : "▼") : "⇅"}
+      </span>
+    </th>
+  );
+}
 
-  // ── Sort state ───────────────────────────────────────────────────────────────
+// ── CompoundInfo ──────────────────────────────────────────────────────────────
+
+function CompoundInfo({ result }: { result: Result & { rank: number } }) {
+  const strength = scoreStrength(result.binding_score);
+  const s = STRENGTH_STYLE[strength];
+  return (
+    <div
+      className="rounded-lg p-4 space-y-3"
+      style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)" }}
+    >
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>
+          Selected compound
+        </p>
+        <p className="text-sm font-semibold leading-snug" style={{ color: "var(--text-primary)" }} title={result.compound_name}>
+          {result.compound_name}
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+          Rank #{result.rank}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div
+          className="col-span-2 flex items-center justify-between rounded p-2.5"
+          style={{ backgroundColor: "var(--bg-card-inner)", border: "1px solid var(--border)" }}
+        >
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            Binding score
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+              {fmt(result.binding_score, 1)} kcal/mol
+            </span>
+            <span
+              className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+              style={{ backgroundColor: s.bg, color: s.color }}
+            >
+              {strength}
+            </span>
+          </div>
+        </div>
+
+        {[
+          { label: "RMSD lower", value: fmt(result.rmsd_lower, 2) },
+          { label: "RMSD upper", value: fmt(result.rmsd_upper, 2) },
+          { label: "H-bonds",    value: String(result.h_bond_count ?? "—") },
+          { label: "Pose file",  value: result.pose_file ? "Available" : "None" },
+        ].map(({ label, value }) => (
+          <div
+            key={label}
+            className="rounded p-2"
+            style={{ backgroundColor: "var(--bg-card-inner)", border: "1px solid var(--border)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wide mb-0.5" style={{ color: "var(--text-muted)" }}>
+              {label}
+            </p>
+            <p className="font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
+              {value}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── AffinityBar ───────────────────────────────────────────────────────────────
+
+function AffinityBar({ score }: { score: number | null }) {
+  if (score == null) return <span style={{ color: "var(--text-muted)" }}>—</span>;
+  const pct = Math.min(100, Math.max(0, (Math.abs(score) / 12) * 100));
+  const color = score <= -9 ? "#4ade80" : score <= -7 ? "#fbbf24" : "#475569";
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "var(--border)" }}>
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
+        {fmt(score, 1)}
+      </span>
+    </div>
+  );
+}
+
+// ── JobListItem ───────────────────────────────────────────────────────────────
+
+function JobListItem({
+  job,
+  active,
+  proteinCode,
+  onClick,
+}: {
+  job: DockingJob;
+  active: boolean;
+  proteinCode: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left px-3 py-2.5 rounded-lg transition-colors cursor-pointer border-0"
+      style={{
+        backgroundColor: active ? "rgba(20,184,166,0.1)" : "transparent",
+        border: `1px solid ${active ? "rgba(20,184,166,0.4)" : "var(--border)"}`,
+      }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <span className="font-mono text-xs font-semibold" style={{ color: active ? "#14b8a6" : "var(--text-primary)" }}>
+          {proteinCode || job.id.slice(0, 8)}
+        </span>
+        <div className="flex-1" />
+        <StatusBadge status={job.status} />
+      </div>
+      <div className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+        {relativeTime(job.created_at)} · {job.id.slice(0, 8)}…
+      </div>
+    </button>
+  );
+}
+
+// ── Results panel (for a single job) ─────────────────────────────────────────
+
+function ResultsPanel({ jobId, proteinCode }: { jobId: string; proteinCode: string }) {
   const [sort, setSort] = useState<SortKey>("rank");
   const [dir, setDir] = useState<SortDir>("asc");
-
-  // ── Viewer state ─────────────────────────────────────────────────────────────
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [poseContent, setPoseContent] = useState<string | null>(null);
   const [poseLoading, setPoseLoading] = useState(false);
   const [viewerMode, setViewerMode] = useState<ViewMode>("cartoon");
 
-  // Protein code persisted by the docking page at dispatch time.
-  const [proteinCode] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return sessionStorage.getItem("pd_last_protein") ?? "";
-  });
-
-  // ── Fetch PDBQT pose on row selection ────────────────────────────────────────
-  useEffect(() => {
-    if (!selectedResultId) {
-      setPoseContent(null);
-      return;
-    }
-    let cancelled = false;
-    setPoseLoading(true);
-    getPoseFile(selectedResultId)
-      .then((text) => {
-        if (!cancelled) setPoseContent(text);
-      })
-      .catch(() => {
-        if (!cancelled) setPoseContent(null);
-      })
-      .finally(() => {
-        if (!cancelled) setPoseLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedResultId]);
-
-  function selectResult(id: string) {
-    setSelectedResultId((prev) => (prev === id ? null : id));
-  }
-
-  // ── Download pose as PDBQT file ───────────────────────────────────────────────
-  function downloadPose(result: Result) {
-    if (!poseContent) return;
-    const safeName = result.compound_name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
-    const score = result.binding_score != null ? Math.abs(result.binding_score).toFixed(1) : "unk";
-    const fileName = `${safeName}_${proteinCode || "protein"}_${score}.pdbqt`;
-    const blob = new Blob([poseContent], { type: "chemical/x-pdbqt" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  // ── Queries ──────────────────────────────────────────────────────────────────
-  const { data: job, isLoading: jobLoading } = useQuery({
+  const { data: job } = useQuery({
     queryKey: ["job", jobId],
     queryFn: () => getJob(jobId),
-    enabled: !!jobId,
-    refetchInterval: (query) => {
-      const s = query.state.data?.status;
-      return s === "done" || s === "failed" ? false : 5000;
+    refetchInterval: (q) => {
+      const s = q.state.data?.status;
+      return s === "done" || s === "failed" ? false : 4000;
     },
   });
 
@@ -258,17 +260,17 @@ function ResultsInner() {
     enabled: job?.status === "done",
   });
 
-  function toggleSort(col: SortKey) {
-    if (sort === col) setDir((d) => (d === "asc" ? "desc" : "asc"));
-    else {
-      setSort(col);
-      setDir("asc");
-    }
-  }
+  useEffect(() => {
+    if (!selectedResultId) { setPoseContent(null); return; }
+    let cancelled = false;
+    setPoseLoading(true);
+    getPoseFile(selectedResultId)
+      .then((text) => { if (!cancelled) setPoseContent(text); })
+      .catch(() => { if (!cancelled) setPoseContent(null); })
+      .finally(() => { if (!cancelled) setPoseLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedResultId]);
 
-  // ── Derived data ─────────────────────────────────────────────────────────────
-
-  // Stable rank order: sort by binding_score ascending (most negative = best = rank 1)
   const ranked = useMemo<(Result & { rank: number })[]>(() => {
     if (!results) return [];
     return [...results]
@@ -276,18 +278,17 @@ function ResultsInner() {
       .map((r, i) => ({ ...r, rank: i + 1 }));
   }, [results]);
 
-  // User-controlled sort for the table display
   const sorted = useMemo(() => {
     return [...ranked].sort((a, b) => {
       let av: number | string, bv: number | string;
       switch (sort) {
-        case "rank":       av = a.rank;                              bv = b.rank;                              break;
-        case "name":       av = a.compound_name.toLowerCase();       bv = b.compound_name.toLowerCase();       break;
-        case "score":      av = a.binding_score ?? 0;                bv = b.binding_score ?? 0;                break;
-        case "rmsd_lower": av = a.rmsd_lower ?? 0;                   bv = b.rmsd_lower ?? 0;                   break;
-        case "rmsd_upper": av = a.rmsd_upper ?? 0;                   bv = b.rmsd_upper ?? 0;                   break;
-        case "h_bonds":    av = a.h_bond_count ?? 0;                 bv = b.h_bond_count ?? 0;                 break;
-        default:           av = a.rank;                              bv = b.rank;
+        case "rank":       av = a.rank;                        bv = b.rank;                        break;
+        case "name":       av = a.compound_name.toLowerCase(); bv = b.compound_name.toLowerCase(); break;
+        case "score":      av = a.binding_score ?? 0;          bv = b.binding_score ?? 0;          break;
+        case "rmsd_lower": av = a.rmsd_lower ?? 0;             bv = b.rmsd_lower ?? 0;             break;
+        case "rmsd_upper": av = a.rmsd_upper ?? 0;             bv = b.rmsd_upper ?? 0;             break;
+        case "h_bonds":    av = a.h_bond_count ?? 0;           bv = b.h_bond_count ?? 0;           break;
+        default:           av = a.rank;                        bv = b.rank;
       }
       if (av < bv) return dir === "asc" ? -1 : 1;
       if (av > bv) return dir === "asc" ? 1 : -1;
@@ -295,97 +296,84 @@ function ResultsInner() {
     });
   }, [ranked, sort, dir]);
 
-  // Chart data: ranked order (best first), use absolute scores for bar width
   const chartData = useMemo(
-    () =>
-      ranked.map((r) => ({
-        id: r.id,
-        name:
-          r.compound_name.length > 20
-            ? r.compound_name.slice(0, 19) + "…"
-            : r.compound_name,
-        absScore: Math.abs(r.binding_score ?? 0),
-        rawScore: r.binding_score,
-      })),
+    () => ranked.map((r) => ({
+      id: r.id,
+      name: r.compound_name.length > 20 ? r.compound_name.slice(0, 19) + "…" : r.compound_name,
+      absScore: Math.abs(r.binding_score ?? 0),
+      rawScore: r.binding_score,
+    })),
     [ranked]
   );
 
   const bestScore = ranked.length > 0 ? ranked[0].binding_score : null;
-  const avgScore =
-    ranked.length > 0
-      ? ranked.reduce((s, r) => s + (r.binding_score ?? 0), 0) / ranked.length
-      : null;
+  const avgScore = ranked.length > 0
+    ? ranked.reduce((s, r) => s + (r.binding_score ?? 0), 0) / ranked.length
+    : null;
   const hBondCount = ranked.filter((r) => (r.h_bond_count ?? 0) >= 2).length;
-
   const selectedResult = ranked.find((r) => r.id === selectedResultId) ?? null;
+  const chartHeight = Math.max(80, ranked.length * 24);
 
-  // Chart height: 26 px per bar, min 100
-  const chartHeight = Math.max(100, ranked.length * 26);
-
-  // ── Early return states ───────────────────────────────────────────────────────
-
-  if (!jobId) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="text-5xl mb-4">📊</div>
-        <h2 className="text-xl font-semibold mb-2">No job selected</h2>
-        <p className="text-[#64748b] text-sm mb-6 max-w-sm">
-          Run a docking job first and then return here to view binding affinities.
-        </p>
-        <Button onClick={() => router.push("/docking")}>← Go to docking setup</Button>
-      </div>
-    );
+  function toggleSort(col: SortKey) {
+    if (sort === col) setDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSort(col); setDir("asc"); }
   }
 
-  if (jobLoading) {
+  function downloadPose(result: Result) {
+    if (!poseContent) return;
+    const safeName = result.compound_name.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+    const score = result.binding_score != null ? Math.abs(result.binding_score).toFixed(1) : "unk";
+    const fileName = `${safeName}_${proteinCode || "protein"}_${score}.pdbqt`;
+    const blob = new Blob([poseContent], { type: "chemical/x-pdbqt" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const cardStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border)",
+  };
+
+  // ── Status states ──────────────────────────────────────────────────────────
+
+  if (!job) {
     return (
-      <div className="flex items-center justify-center py-24">
+      <div className="flex items-center justify-center py-16">
         <Spinner size="lg" />
       </div>
     );
   }
 
-  if (job?.status === "failed") {
+  if (job.status === "failed") {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="text-5xl mb-4">❌</div>
-        <h2 className="text-xl font-semibold mb-2 text-red-400">Job failed</h2>
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-lg font-semibold mb-2" style={{ color: "#ef4444" }}>Job failed</p>
         {job.error_message && (
-          <p className="text-[#64748b] text-xs font-mono mb-6 max-w-lg break-all">
+          <p className="text-xs font-mono max-w-lg break-all" style={{ color: "var(--text-muted)" }}>
             {job.error_message}
           </p>
         )}
-        <div className="flex gap-2">
-          <Button variant="ghost" onClick={() => router.push(`/queue?job_id=${jobId}`)}>
-            View job details
-          </Button>
-          <Button onClick={() => router.push("/docking")}>Try again →</Button>
-        </div>
       </div>
     );
   }
 
-  if (job && job.status !== "done") {
+  if (job.status !== "done") {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
+      <div className="flex flex-col items-center justify-center py-16 text-center gap-4">
         <Spinner size="lg" />
-        <h2 className="text-lg font-semibold mt-6 mb-2">Docking in progress</h2>
-        <div className="mb-4">
-          <StatusBadge status={job.status} />
-        </div>
-        <p className="text-[#64748b] text-sm mb-6">
+        <StatusBadge status={job.status} />
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           Results will appear here when the job completes.
         </p>
-        <Button onClick={() => router.push(`/queue?job_id=${jobId}`)}>
-          Watch progress →
-        </Button>
       </div>
     );
   }
 
   if (resultsLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
+      <div className="flex items-center justify-center py-16">
         <Spinner size="lg" />
       </div>
     );
@@ -393,83 +381,88 @@ function ResultsInner() {
 
   if (!results || results.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="text-5xl mb-4">🔍</div>
-        <h2 className="text-xl font-semibold mb-2">No results found</h2>
-        <p className="text-[#64748b] text-sm mb-6">
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <p className="text-base font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+          No results
+        </p>
+        <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           The job completed but returned no binding scores.
         </p>
-        <Button onClick={() => router.push("/docking")}>← Run a new docking job</Button>
       </div>
     );
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────────
+  // ── Main results render ────────────────────────────────────────────────────
 
   return (
-    <div className="pb-20 space-y-5">
-      {/* ── Stats cards (full width) ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Total results",      value: ranked.length,                              color: "text-[#14b8a6]" },
-          { label: "Best (kcal/mol)",    value: bestScore != null ? bestScore.toFixed(1) : "—", color: "text-green-400" },
-          { label: "Avg (kcal/mol)",     value: avgScore  != null ? avgScore.toFixed(1)  : "—", color: "text-[#f1f5f9]" },
-          { label: "≥ 2 H-bonds",        value: hBondCount,                                 color: "text-amber-400" },
+          { label: "Results",       value: ranked.length,                                   color: "#14b8a6" },
+          { label: "Best (kcal/mol)", value: bestScore != null ? bestScore.toFixed(1) : "—", color: "#4ade80" },
+          { label: "Avg (kcal/mol)", value: avgScore != null ? avgScore.toFixed(1) : "—",   color: "var(--text-primary)" },
+          { label: "≥ 2 H-bonds",   value: hBondCount,                                      color: "#fbbf24" },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-[#161b27] border border-[#1e2433] rounded-lg p-4">
-            <div className={`font-mono text-2xl font-medium mb-1 ${color}`}>{value}</div>
-            <div className="text-xs text-[#64748b] uppercase tracking-wider">{label}</div>
+          <div key={label} className="rounded-lg p-3" style={cardStyle}>
+            <div className="font-mono text-xl font-semibold mb-0.5" style={{ color }}>
+              {value}
+            </div>
+            <div className="text-[10px] uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+              {label}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── Two-column content ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-5 items-start">
+      {/* Two-column: table + viewer */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
 
-        {/* ════ LEFT COLUMN: Table + Chart ════ */}
-        <div className="min-w-0 space-y-4">
-
-          {/* Table card */}
-          <div className="bg-[#161b27] border border-[#1e2433] rounded-lg overflow-hidden">
-            {/* Table header */}
-            <div className="px-4 py-3 border-b border-[#1e2433] flex items-center justify-between gap-3 flex-wrap">
+        {/* Left: table + chart */}
+        <div className="space-y-4 min-w-0">
+          <div className="rounded-lg overflow-hidden" style={cardStyle}>
+            <div
+              className="px-4 py-3 border-b flex items-center justify-between gap-3"
+              style={{ borderColor: "var(--border)" }}
+            >
               <div>
-                <h3 className="text-sm font-semibold text-[#f1f5f9]">
+                <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
                   Binding affinity results
                 </h3>
-                <p className="text-xs text-[#64748b] mt-0.5">
-                  Job{" "}
-                  <span className="font-mono text-[#94a3b8]">{jobId.slice(0, 8)}…</span>
-                  {" · "}click a row to view its 3D pose
+                <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                  Click a row to view its 3D pose
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => window.open(getResultsCsvUrl(jobId), "_blank")}
+              <a
+                href={getResultsCsvUrl(jobId)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs px-3 py-1.5 rounded border no-underline font-medium transition-colors"
+                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
               >
                 Export CSV
-              </Button>
+              </a>
             </div>
 
-            {/* Scrollable table */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse min-w-[620px]">
-                <thead className="bg-[#141927] border-b border-[#1e2433]">
+              <table className="w-full border-collapse min-w-[560px]">
+                <thead style={{ backgroundColor: "var(--bg-table-header)" }}>
                   <tr>
-                    <SortTh label="Rank"       col="rank"       sort={sort} dir={dir} onClick={toggleSort} />
-                    <SortTh label="Compound"   col="name"       sort={sort} dir={dir} onClick={toggleSort} />
-                    <SortTh label="Score"      col="score"      sort={sort} dir={dir} onClick={toggleSort} right />
-                    <SortTh label="RMSD lo"    col="rmsd_lower" sort={sort} dir={dir} onClick={toggleSort} right />
-                    <SortTh label="RMSD hi"    col="rmsd_upper" sort={sort} dir={dir} onClick={toggleSort} right />
-                    <SortTh label="H-bonds"    col="h_bonds"    sort={sort} dir={dir} onClick={toggleSort} right />
-                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">
+                    <SortTh label="Rank"    col="rank"       sort={sort} dir={dir} onClick={toggleSort} />
+                    <SortTh label="Compound" col="name"      sort={sort} dir={dir} onClick={toggleSort} />
+                    <SortTh label="Score"   col="score"      sort={sort} dir={dir} onClick={toggleSort} right />
+                    <SortTh label="RMSD lo" col="rmsd_lower" sort={sort} dir={dir} onClick={toggleSort} right />
+                    <SortTh label="RMSD hi" col="rmsd_upper" sort={sort} dir={dir} onClick={toggleSort} right />
+                    <SortTh label="H-bonds" col="h_bonds"    sort={sort} dir={dir} onClick={toggleSort} right />
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
                       Affinity
                     </th>
-                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold text-[#64748b] uppercase tracking-wider">
+                    <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
                       Strength
                     </th>
-                    <th className="px-3 py-2.5 text-center text-[10px] font-semibold text-[#64748b] uppercase tracking-wider whitespace-nowrap">
+                    <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
                       Pose
                     </th>
                   </tr>
@@ -477,38 +470,42 @@ function ResultsInner() {
                 <tbody>
                   {sorted.map((r, i) => {
                     const strength = scoreStrength(r.binding_score);
+                    const s = STRENGTH_STYLE[strength];
                     const isSelected = r.id === selectedResultId;
-                    const rowBg = isSelected
-                      ? "bg-[#14b8a6]/10 border-l-2 border-l-[#14b8a6]"
-                      : i % 2 === 0
-                        ? "bg-[#161b27]"
-                        : "bg-[#131820]";
                     return (
                       <tr
                         key={r.id}
-                        className={`border-b border-[#1e2433] last:border-b-0 transition-colors hover:bg-[#14b8a6]/5 ${rowBg}`}
+                        className="border-b transition-colors"
+                        style={{
+                          borderColor: "var(--border)",
+                          backgroundColor: isSelected
+                            ? "rgba(20,184,166,0.08)"
+                            : i % 2 === 0
+                              ? "transparent"
+                              : "var(--bg-card-inner)",
+                          borderLeft: isSelected ? "2px solid #14b8a6" : "2px solid transparent",
+                        }}
+                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(20,184,166,0.04)"; }}
+                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = i % 2 === 0 ? "transparent" : "var(--bg-card-inner)"; }}
                       >
-                        <td className="px-3 py-2 font-mono text-xs text-[#64748b]">
+                        <td className="px-3 py-2 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                           #{r.rank}
                         </td>
-                        <td
-                          className="px-3 py-2 font-medium text-[#f1f5f9] max-w-[180px]"
-                          title={r.compound_name}
-                        >
-                          <span className="block truncate text-sm">
+                        <td className="px-3 py-2 font-medium max-w-[160px]" title={r.compound_name}>
+                          <span className="block truncate text-sm" style={{ color: "var(--text-primary)" }}>
                             {r.compound_name}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-sm text-[#94a3b8]">
+                        <td className="px-3 py-2 text-right font-mono text-sm" style={{ color: "var(--text-secondary)" }}>
                           {fmt(r.binding_score, 1)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs text-[#64748b]">
+                        <td className="px-3 py-2 text-right font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                           {fmt(r.rmsd_lower, 2)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs text-[#64748b]">
+                        <td className="px-3 py-2 text-right font-mono text-xs" style={{ color: "var(--text-muted)" }}>
                           {fmt(r.rmsd_upper, 2)}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-xs text-[#94a3b8]">
+                        <td className="px-3 py-2 text-right font-mono text-xs" style={{ color: "var(--text-secondary)" }}>
                           {r.h_bond_count ?? "—"}
                         </td>
                         <td className="px-3 py-2">
@@ -516,21 +513,22 @@ function ResultsInner() {
                         </td>
                         <td className="px-3 py-2">
                           <span
-                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${STRENGTH_CLS[strength]}`}
+                            className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold"
+                            style={{ backgroundColor: s.bg, color: s.color }}
                           >
                             {strength}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
-                            onClick={() => selectResult(r.id)}
-                            className={`text-xs font-medium px-2 py-0.5 rounded cursor-pointer border-0 transition-colors ${
-                              isSelected
-                                ? "bg-[#14b8a6]/15 text-[#14b8a6]"
-                                : "bg-[#1e2433] text-[#64748b] hover:text-[#f1f5f9]"
-                            }`}
+                            onClick={() => setSelectedResultId((prev) => prev === r.id ? null : r.id)}
+                            className="text-xs font-medium px-2 py-0.5 rounded cursor-pointer border-0 transition-colors"
+                            style={{
+                              backgroundColor: isSelected ? "rgba(20,184,166,0.15)" : "var(--bg-card-inner)",
+                              color: isSelected ? "#14b8a6" : "var(--text-muted)",
+                            }}
                           >
-                            {isSelected ? "Viewing" : "View pose"}
+                            {isSelected ? "Viewing" : "View"}
                           </button>
                         </td>
                       </tr>
@@ -540,51 +538,35 @@ function ResultsInner() {
               </table>
             </div>
 
-            {/* ── Mini score chart ── */}
-            <div className="border-t border-[#1e2433] px-4 pt-3 pb-4">
-              <p className="text-[10px] font-semibold text-[#64748b] uppercase tracking-wider mb-2">
-                Score distribution — click a bar to select compound
+            {/* Mini chart */}
+            <div className="border-t px-4 pt-3 pb-4" style={{ borderColor: "var(--border)" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>
+                Score distribution — click bar to select
               </p>
-              <div
-                className="overflow-y-auto"
-                style={{ maxHeight: 280 }}
-              >
-                {/* Explicit height so ResponsiveContainer measures width only */}
+              <div className="overflow-y-auto" style={{ maxHeight: 240 }}>
                 <div style={{ height: chartHeight }}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      layout="vertical"
-                      data={chartData}
-                      margin={{ top: 2, right: 36, bottom: 2, left: 4 }}
-                    >
+                    <BarChart layout="vertical" data={chartData} margin={{ top: 2, right: 36, bottom: 2, left: 4 }}>
                       <XAxis
                         type="number"
                         domain={[0, "dataMax"]}
-                        tick={{ fontSize: 9, fill: "#64748b" }}
+                        tick={{ fontSize: 9, fill: "var(--text-muted)" }}
                         tickFormatter={(v) => `-${v}`}
-                        axisLine={{ stroke: "#1e2433" }}
-                        tickLine={{ stroke: "#1e2433" }}
+                        axisLine={{ stroke: "var(--border)" }}
+                        tickLine={{ stroke: "var(--border)" }}
                       />
                       <YAxis
                         type="category"
                         dataKey="name"
-                        width={130}
-                        tick={{ fontSize: 9, fill: "#94a3b8" }}
+                        width={120}
+                        tick={{ fontSize: 9, fill: "var(--text-secondary)" }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <Tooltip content={<ChartTooltip />} />
-                      <Bar
-                        dataKey="absScore"
-                        radius={[0, 3, 3, 0]}
-                        onClick={(data) => selectResult(data.id as string)}
-                        cursor="pointer"
-                      >
+                      <Bar dataKey="absScore" radius={[0, 3, 3, 0]} onClick={(d) => setSelectedResultId((prev) => prev === d.id ? null : d.id as string)} cursor="pointer">
                         {chartData.map((entry) => (
-                          <Cell
-                            key={entry.id}
-                            fill={barFill(entry.rawScore, entry.id === selectedResultId)}
-                          />
+                          <Cell key={entry.id} fill={barFill(entry.rawScore, entry.id === selectedResultId)} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -595,34 +577,36 @@ function ResultsInner() {
           </div>
         </div>
 
-        {/* ════ RIGHT COLUMN: Pose viewer (sticky) ════ */}
-        <div className="sticky top-4 space-y-3">
-
-          {/* Compound info — shown when a row is selected */}
+        {/* Right: viewer (sticky) */}
+        <div className="sticky top-[72px] space-y-3">
           {selectedResult ? (
             <CompoundInfo result={selectedResult} />
           ) : (
-            <div className="bg-[#161b27] border border-[#1e2433] rounded-lg p-4 text-center">
-              <p className="text-xs text-[#3a4560]">
-                Click "View pose" on any result row to inspect the docked conformation
+            <div
+              className="rounded-lg p-4 text-center"
+              style={cardStyle}
+            >
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Click &ldquo;View&rdquo; on any row to inspect the docked conformation
               </p>
             </div>
           )}
 
-          {/* Viewer card */}
-          <div className="bg-[#161b27] border border-[#1e2433] rounded-lg overflow-hidden">
-            {/* Viewer toolbar */}
-            <div className="px-3 py-2.5 border-b border-[#1e2433] flex items-center justify-between gap-2 flex-wrap">
+          <div className="rounded-lg overflow-hidden" style={cardStyle}>
+            <div
+              className="px-3 py-2.5 border-b flex items-center justify-between gap-2 flex-wrap"
+              style={{ borderColor: "var(--border)" }}
+            >
               <div className="flex gap-1">
                 {(["cartoon", "surface", "stick"] as ViewMode[]).map((m) => (
                   <button
                     key={m}
                     onClick={() => setViewerMode(m)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer border-0 transition-colors ${
-                      viewerMode === m
-                        ? "bg-[#14b8a6]/15 text-[#14b8a6]"
-                        : "bg-transparent text-[#64748b] hover:text-[#f1f5f9]"
-                    }`}
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold cursor-pointer border-0 transition-colors"
+                    style={{
+                      backgroundColor: viewerMode === m ? "rgba(20,184,166,0.15)" : "transparent",
+                      color: viewerMode === m ? "#14b8a6" : "var(--text-muted)",
+                    }}
                   >
                     {m.charAt(0).toUpperCase() + m.slice(1)}
                   </button>
@@ -632,20 +616,24 @@ function ResultsInner() {
               <button
                 onClick={() => selectedResult && downloadPose(selectedResult)}
                 disabled={!poseContent || !selectedResult}
-                className={`text-xs font-medium px-2.5 py-1 rounded border transition-colors ${
-                  poseContent && selectedResult
-                    ? "border-[#1e2433] text-[#64748b] hover:text-[#f1f5f9] hover:border-[#2a3145] cursor-pointer"
-                    : "border-[#1e2433] text-[#3a4560] cursor-not-allowed"
-                } bg-transparent`}
+                className="text-xs font-medium px-2.5 py-1 rounded border transition-colors"
+                style={{
+                  borderColor: "var(--border)",
+                  color: poseContent && selectedResult ? "var(--text-secondary)" : "var(--text-muted)",
+                  cursor: poseContent && selectedResult ? "pointer" : "not-allowed",
+                  backgroundColor: "transparent",
+                }}
               >
                 Download pose
               </button>
             </div>
 
-            {/* 3-D viewer */}
             <div className="p-2 relative">
               {poseLoading && (
-                <div className="absolute inset-2 flex items-center justify-center bg-[#0f1117]/75 z-10 rounded">
+                <div
+                  className="absolute inset-2 flex items-center justify-center z-10 rounded"
+                  style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+                >
                   <Spinner size="md" />
                 </div>
               )}
@@ -654,80 +642,158 @@ function ResultsInner() {
                 <ProteinViewer
                   pdbId={proteinCode || undefined}
                   pdbqtContent={poseContent ?? undefined}
-                  height="360px"
+                  height="340px"
                   mode={viewerMode}
                 />
+              ) : proteinCode ? (
+                <ProteinViewer pdbId={proteinCode} height="340px" mode={viewerMode} />
               ) : (
-                // Protein-only preview while no compound is selected
-                proteinCode ? (
-                  <ProteinViewer
-                    pdbId={proteinCode}
-                    height="360px"
-                    mode={viewerMode}
-                  />
-                ) : (
-                  <div
-                    className="flex flex-col items-center justify-center text-center"
-                    style={{ height: "360px" }}
-                  >
-                    <div className="text-4xl mb-3 opacity-10">🔬</div>
-                    <p className="text-xs text-[#3a4560] max-w-[180px]">
-                      Select a result to load its docked pose
-                    </p>
-                  </div>
-                )
+                <div
+                  className="flex flex-col items-center justify-center text-center"
+                  style={{ height: 340 }}
+                >
+                  <p className="text-xs max-w-[180px]" style={{ color: "var(--text-muted)" }}>
+                    Select a result to load its docked pose
+                  </p>
+                </div>
               )}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── Fixed bottom bar ── */}
-      <div className="fixed bottom-0 left-[220px] right-0 h-16 bg-[#161b27]/95 backdrop-blur border-t border-[#1e2433] flex items-center justify-between px-8 z-20">
-        <div className="text-sm text-[#64748b]">
-          <strong className="text-[#14b8a6] font-mono">{ranked.length}</strong>{" "}
-          result{ranked.length !== 1 ? "s" : ""}
-          {bestScore != null && (
-            <>
-              {" · "}best{" "}
-              <strong className="text-green-400 font-mono">
-                {bestScore.toFixed(1)}
-              </strong>{" "}
-              kcal/mol
-            </>
-          )}
-          {selectedResult && (
-            <span className="ml-3 text-[#14b8a6]">
-              Viewing: {selectedResult.compound_name.slice(0, 30)}
-              {selectedResult.compound_name.length > 30 ? "…" : ""}
-            </span>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => router.push(`/queue?job_id=${jobId}`)}
-          >
-            ← Job details
-          </Button>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => window.open(getResultsCsvUrl(jobId), "_blank")}
-          >
-            Download CSV
-          </Button>
-          <Button variant="primary" size="md" onClick={() => router.push("/")}>
-            New search →
-          </Button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Page export (Suspense boundary for useSearchParams) ───────────────────────
+// ── Inner page ────────────────────────────────────────────────────────────────
+
+function ResultsInner() {
+  const router = useRouter();
+
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const { data, isLoading: jobsLoading } = useQuery({
+    queryKey: ["jobs"],
+    queryFn: () => getJobs({ limit: 50 }),
+    refetchInterval: 8000,
+  });
+
+  const jobs = data?.jobs ?? [];
+
+  // Resolve protein code from sessionStorage map
+  const jobProteinMap: Record<string, string> = useMemo(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      return JSON.parse(sessionStorage.getItem("pd_job_proteins") ?? "{}");
+    } catch { return {}; }
+  }, []);
+
+  // Auto-select first job if none selected
+  useEffect(() => {
+    if (!selectedJobId && jobs.length > 0) {
+      setSelectedJobId(jobs[0].id);
+    }
+  }, [jobs, selectedJobId]);
+
+  const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
+
+  const cardStyle = {
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border)",
+  };
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+
+  if (!jobsLoading && jobs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center mb-4 text-xl"
+          style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)" }}
+        >
+          📊
+        </div>
+        <h2 className="text-xl font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+          No docking jobs yet
+        </h2>
+        <p className="text-sm mb-6 max-w-sm" style={{ color: "var(--text-secondary)" }}>
+          Run a docking job from the home page and results will appear here.
+        </p>
+        <button
+          onClick={() => router.push("/")}
+          className="px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer border-0"
+          style={{ backgroundColor: "#14b8a6", color: "#000" }}
+        >
+          ← Start on home page
+        </button>
+      </div>
+    );
+  }
+
+  // ── Main render ────────────────────────────────────────────────────────────
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6 items-start">
+
+        {/* Job list sidebar */}
+        <div className="sticky top-[72px]">
+          <div className="rounded-xl overflow-hidden" style={cardStyle}>
+            <div
+              className="px-4 py-3 border-b"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                Docking Jobs
+              </h2>
+              <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {jobs.length} total · select to view results
+              </p>
+            </div>
+
+            <div className="p-2 space-y-1 max-h-[70vh] overflow-y-auto">
+              {jobsLoading && (
+                <div className="flex items-center justify-center py-8">
+                  <Spinner size="sm" />
+                </div>
+              )}
+              {jobs.map((job) => (
+                <JobListItem
+                  key={job.id}
+                  job={job}
+                  active={job.id === selectedJobId}
+                  proteinCode={jobProteinMap[job.id] ?? ""}
+                  onClick={() => setSelectedJobId(job.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Results panel */}
+        <div>
+          {selectedJob ? (
+            <ResultsPanel
+              jobId={selectedJob.id}
+              proteinCode={jobProteinMap[selectedJob.id] ?? ""}
+            />
+          ) : (
+            <div
+              className="rounded-xl flex items-center justify-center"
+              style={{ ...cardStyle, height: 300 }}
+            >
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                Select a job to view its results
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Page export ───────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   return (

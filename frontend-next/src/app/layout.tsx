@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Mono } from "next/font/google";
 import { Providers } from "@/components/Providers";
-import { Sidebar } from "@/components/Sidebar";
-import { Topbar } from "@/components/Topbar";
+import { TopNav } from "@/components/TopNav";
 import "./globals.css";
 
 const inter = Inter({
@@ -32,14 +31,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} ${ibmPlexMono.variable} h-full`}
+      suppressHydrationWarning
     >
-      <body className="h-full flex bg-[#0f1117] text-[#f1f5f9] antialiased">
+      <body className="h-full flex flex-col antialiased">
         <Providers>
-          <Sidebar />
-          <div className="flex flex-col flex-1 min-w-0 ml-[220px]">
-            <Topbar />
-            <main className="flex-1 overflow-y-auto p-6">{children}</main>
-          </div>
+          <TopNav />
+          <main className="flex-1 overflow-y-auto">{children}</main>
         </Providers>
       </body>
     </html>

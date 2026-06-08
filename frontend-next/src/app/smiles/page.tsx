@@ -375,7 +375,7 @@ export default function SmilesPage() {
       </div>
 
       {/* Fixed bottom bar */}
-      <div className="fixed bottom-0 left-[220px] right-0 h-16 bg-[#161b27]/95 backdrop-blur border-t border-[#1e2433] flex items-center justify-between px-8 z-20">
+      <div className="fixed bottom-0 left-0 right-0 h-16 bg-[#161b27]/95 backdrop-blur border-t border-[#1e2433] flex items-center justify-between px-8 z-20">
         <div className="text-sm text-[#64748b]">
           {valid > 0 ? (
             <>

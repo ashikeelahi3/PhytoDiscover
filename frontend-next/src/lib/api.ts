@@ -54,6 +54,7 @@ export async function getStats(): Promise<CompoundStats> {
 export async function searchCompounds(params: {
   name?: string;
   source_plant?: string;
+  pubchem_cid?: number;
   lipinski_pass?: boolean;
   has_smiles?: boolean;
   min_mw?: number;

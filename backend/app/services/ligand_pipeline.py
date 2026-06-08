@@ -85,6 +85,22 @@ def run_ligand_preparation(
     if not all_smiles:
         raise LigandPrepError(f"No SMILES found for job {job_id}")
 
+    # Deduplicate by SMILES string so the same molecule is never docked twice,
+    # even if compound_ids and smiles_list both contained it.
+    seen: set[str] = set()
+    deduped = []
+    for name, smiles in all_smiles:
+        normalized = smiles.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            deduped.append((name, smiles))
+    if len(deduped) < len(all_smiles):
+        logger.info(
+            f"[{job_id}] Removed {len(all_smiles) - len(deduped)} duplicate SMILES; "
+            f"{len(deduped)} unique ligands remain"
+        )
+    all_smiles = deduped
+
     logger.info(f"[{job_id}] Processing {len(all_smiles)} SMILES")
 
     obabel = shutil.which("obabel")
