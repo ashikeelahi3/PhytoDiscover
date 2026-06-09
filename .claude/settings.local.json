@@ -5,7 +5,9 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Read(//tmp/**)",
-      "Bash(open *)"
+      "Bash(open *)",
+      "Bash(python3 *)",
+      "Bash(python *)"
     ]
   }
 }
