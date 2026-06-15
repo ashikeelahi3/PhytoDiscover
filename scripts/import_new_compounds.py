@@ -360,7 +360,7 @@ def run_rdkit_enrichment() -> tuple[int, int]:
             update_batch.clear()
 
         # Server-side cursor streams rows without loading all into memory
-        with conn.cursor("enrich_cursor") as read_cur, conn.cursor() as write_cur:
+        with conn.cursor("enrich_cursor", withhold=True) as read_cur, conn.cursor() as write_cur:
             read_cur.itersize = ENRICH_BATCH
             read_cur.execute(_SELECT_PENDING)
 
