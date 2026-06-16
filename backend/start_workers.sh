@@ -28,8 +28,8 @@ celery -A app.celery_app worker \
     --concurrency=2 \
     --queues=docking \
     --hostname=docking-worker@%h \
-    --logfile="$LOGS_DIR/worker_docking.log" \
-    --detach
+    >> "$LOGS_DIR/worker_docking.log" 2>&1 &
+DOCKING_PID=$!
 
 # Worker 3: fast queue (validation, enrichment)
 celery -A app.celery_app worker \
@@ -37,8 +37,9 @@ celery -A app.celery_app worker \
     --concurrency=4 \
     --queues=fast \
     --hostname=fast-worker@%h \
-    --logfile="$LOGS_DIR/worker_fast.log" \
-    --detach
+    >> "$LOGS_DIR/worker_fast.log" 2>&1 &
+FAST_PID=$!
 
-echo "Workers started. Logs: $LOGS_DIR"
+echo "Workers started (docking PID=$DOCKING_PID, fast PID=$FAST_PID). Logs: $LOGS_DIR"
 echo "Monitor at http://localhost:5555"
+wait

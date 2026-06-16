@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     @field_validator("WORKSPACE_BASE_PATH")
     @classmethod
     def must_be_absolute(cls, v: str) -> str:
-        if not v.startswith("/"):
+        if not Path(v).is_absolute():
             raise ValueError("WORKSPACE_BASE_PATH must be an absolute path")
         return v.rstrip("/")
 

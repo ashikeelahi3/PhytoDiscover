@@ -18,7 +18,7 @@ export function Providers({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="dark" disableTransitionOnChange nonce="">
       <QueryClientProvider client={queryClient}>
         <SessionProvider>
           <CompoundSelectionProvider>

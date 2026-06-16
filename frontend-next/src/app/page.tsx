@@ -17,6 +17,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import type { GridMode, Phytochemical } from "@/lib/types";
+import { ProteinViewer } from "@/components/ProteinViewer";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -823,10 +824,16 @@ function ProteinRowCard({
     >
       {/* Row header */}
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+        <span
+          className="text-xs font-medium"
+          style={{ color: "var(--text-muted)" }}
+        >
           #{index + 1}
         </span>
-        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: statusColor }}
+        />
         <span className="text-xs" style={{ color: statusColor }}>
           {statusLabel}
         </span>
@@ -846,7 +853,9 @@ function ProteinRowCard({
             className="text-xs cursor-pointer bg-transparent border-0 transition-colors"
             style={{ color: "var(--text-muted)" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--text-muted)")
+            }
             aria-label="Remove protein"
           >
             ✕
@@ -881,7 +890,10 @@ function ProteinRowCard({
 
       {/* Loading indicator */}
       {row.status === "fetching" && (
-        <div className="flex items-center gap-2 text-xs" style={{ color: "#f59e0b" }}>
+        <div
+          className="flex items-center gap-2 text-xs"
+          style={{ color: "#f59e0b" }}
+        >
           <Spinner size="sm" />
           Fetching protein…
         </div>
@@ -897,17 +909,23 @@ function ProteinRowCard({
       {/* Chain selector */}
       {row.chains.length > 0 && row.status !== "fetching" && (
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: "var(--text-muted)" }}>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-wider mb-1.5"
+            style={{ color: "var(--text-muted)" }}
+          >
             Chain
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {row.chains.map((ch) => (
+            {[...row.chains].sort().map((ch) => (
               <button
                 key={ch}
                 onClick={() => onChainChange(ch)}
                 className="px-2.5 py-1 rounded text-xs font-mono font-semibold cursor-pointer border transition-colors"
                 style={{
-                  backgroundColor: row.chain === ch ? "rgba(20,184,166,0.1)" : "var(--bg-card)",
+                  backgroundColor:
+                    row.chain === ch
+                      ? "rgba(20,184,166,0.1)"
+                      : "var(--bg-card)",
                   borderColor: row.chain === ch ? "#14b8a6" : "var(--border)",
                   color: row.chain === ch ? "#14b8a6" : "var(--text-secondary)",
                 }}
@@ -933,18 +951,47 @@ function ProteinRowCard({
             <div
               key={label as string}
               className="rounded px-2 py-1"
-              style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)" }}
+              style={{
+                backgroundColor: "var(--bg-card)",
+                border: "1px solid var(--border)",
+              }}
             >
-              <div className="text-[9px] uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+              <div
+                className="text-[9px] uppercase tracking-wide"
+                style={{ color: "var(--text-muted)" }}
+              >
                 {label}
               </div>
-              <div className="font-mono text-[11px]" style={{ color: "#14b8a6" }}>
+              <div
+                className="font-mono text-[11px]"
+                style={{ color: "#14b8a6" }}
+              >
                 {(val as number).toFixed(1)}
               </div>
             </div>
           ))}
         </div>
       )}
+      <ProteinViewer
+        pdbId={row.code || undefined}
+        selectedChain={row.chain || undefined}
+        gridBox={
+          row.gridParams
+            ? {
+                center: {
+                  x: row.gridParams.center_x,
+                  y: row.gridParams.center_y,
+                  z: row.gridParams.center_z,
+                },
+                size: {
+                  x: row.gridParams.size_x,
+                  y: row.gridParams.size_y,
+                  z: row.gridParams.size_z,
+                },
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }
