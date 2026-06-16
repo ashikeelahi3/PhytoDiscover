@@ -17,6 +17,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import type { GridMode, Phytochemical } from "@/lib/types";
+import FileUploader from "@/components/FileUploader";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -458,6 +459,7 @@ export default function HomePage() {
                   autoComplete="off"
                   spellCheck={false}
                 />
+                <FileUploader />
                 <p className="text-xs mt-1.5" style={{ color: "var(--text-muted)" }}>
                   Shows only compounds with SMILES (dockable).
                 </p>
