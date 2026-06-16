@@ -33,3 +33,5 @@ def test_search_plants_with_smiles_filter():
     if len(data) > 0:
         assert isinstance(data[0], str)
 
+
+

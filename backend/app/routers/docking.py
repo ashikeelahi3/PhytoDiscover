@@ -298,6 +298,60 @@ def results_csv(
     )
 
 
+# ── GET /results/{job_id}/plants/csv ──────────────────────────────────────────
+
+_PLANT_CSV_FIELDS = ["compound_name", "smiles", "source_plant", "plant_family"]
+
+@router.get("/results/{job_id}/plants/csv")
+def results_plants_csv(
+    job_id:  UUID,
+    db:      Session     = Depends(get_db),
+    session: UserSession = Depends(get_current_session),
+) -> StreamingResponse:
+    job = db.get(DockingJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    _assert_owns_job(job, session)
+
+    stmt = (
+        select(
+            Result.compound_name.label("compound_name"),
+            Phytochemical.smiles.label("smiles"),
+            Phytochemical.source_plant.label("source_plant"),
+            Phytochemical.plant_family.label("plant_family"),
+        )
+        .join(Phytochemical, Result.compound_name == Phytochemical.name)
+        .where(Result.job_id == job_id)
+        .order_by(Result.binding_score.asc())
+    )
+    rows = db.execute(stmt).all()
+
+    def _generate():
+        buf = io.StringIO()
+        writer = csv.DictWriter(buf, fieldnames=_PLANT_CSV_FIELDS)
+        writer.writeheader()
+        yield buf.getvalue()
+
+        for r in rows:
+            buf.seek(0)
+            buf.truncate(0)
+            writer.writerow({
+                "compound_name": r.compound_name,
+                "smiles":        r.smiles,
+                "source_plant":  r.source_plant,
+                "plant_family":  r.plant_family,
+            })
+            yield buf.getvalue()
+
+    return StreamingResponse(
+        _generate(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="results_plants_{job_id}.csv"'
+        },
+    )
+
+
 # ── GET /results/{job_id} ─────────────────────────────────────────────────────
 
 @router.get("/results/{job_id}", response_model=list[ResultOut])

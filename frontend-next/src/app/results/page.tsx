@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { getJobs, getJob, getResults, getResultsCsvUrl, getPoseFile } from "@/lib/api";
+import { getJobs, getJob, getResults, getResultsCsvUrl, getResultsPlantsCsvUrl, getPoseFile } from "@/lib/api";
 import type { DockingJob, Result } from "@/lib/types";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -433,17 +433,30 @@ function ResultsPanel({ jobId, proteinCode }: { jobId: string; proteinCode: stri
                   Click a row to view its 3D pose
                 </p>
               </div>
-              <a
-                href={getResultsCsvUrl(jobId)}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs px-3 py-1.5 rounded border no-underline font-medium transition-colors"
-                style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
-              >
-                Export CSV
-              </a>
+              <div className="flex gap-2">
+                <a
+                  href={getResultsCsvUrl(jobId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-3 py-1.5 rounded border no-underline font-medium transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+                >
+                  Export CSV
+                </a>
+                <a
+                  href={getResultsPlantsCsvUrl(jobId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-3 py-1.5 rounded border no-underline font-medium transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+                >
+                  Export Plants
+                </a>
+              </div>
             </div>
 
             <div className="overflow-x-auto">

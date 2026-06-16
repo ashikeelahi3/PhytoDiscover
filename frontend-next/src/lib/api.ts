@@ -183,6 +183,11 @@ export function getResultsCsvUrl(jobId: string): string {
   return `/api/docking/results/${jobId}/csv`;
 }
 
+export function getResultsPlantsCsvUrl(jobId: string): string {
+  return `/api/docking/results/${jobId}/plants/csv`;
+}
+
+
 export async function getPoseFile(resultId: string): Promise<string> {
   const { data } = await api.get<string>(`/api/docking/pose/${resultId}`, {
     responseType: "text",
