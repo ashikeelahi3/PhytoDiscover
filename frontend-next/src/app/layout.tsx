@@ -36,7 +36,7 @@ export default function RootLayout({
       className={cn("h-full", inter.variable, ibmPlexMono.variable, "font-sans", geist.variable)}
       suppressHydrationWarning
     >
-      <body className="h-full flex flex-col antialiased">
+      <body className="h-full flex flex-col antialiased" suppressHydrationWarning>
         <Providers>
           <TopNav />
           <main className="flex-1 overflow-y-auto">{children}</main>

@@ -1,8 +1,11 @@
 import csv
 import io
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import case, func, select
@@ -61,6 +64,55 @@ def _build_filters(
     return filters
 
 
+# ── PubChem fallback ─────────────────────────────────────────────────────────
+
+_PUBCHEM_URL = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{name}/property/IUPACName,IsomericSMILES,InChI,InChIKey,MolecularWeight,XLogP,HBondDonorCount,HBondAcceptorCount,TPSA,RotatableBondCount/JSON"
+
+
+def _search_pubchem(name: str) -> list[PhytochemicalOut]:
+    try:
+        r = httpx.get(_PUBCHEM_URL.format(name=name), timeout=10)
+        if r.status_code != 200:
+            return []
+        props_list = r.json()["PropertyTable"]["Properties"]
+    except Exception:
+        return []
+
+    now = datetime.now(timezone.utc)
+    results = []
+    for p in props_list:
+        mw = p.get("MolecularWeight")
+        hbd = p.get("HBondDonorCount")
+        hba = p.get("HBondAcceptorCount")
+        lipinski = (
+            mw is not None and float(mw) <= 500
+            and hbd is not None and hbd <= 5
+            and hba is not None and hba <= 10
+        )
+        results.append(PhytochemicalOut(
+            id=uuid.uuid4(),
+            name=name,
+            iupac_name=p.get("IUPACName"),
+            market_name=None,
+            pubchem_cid=p.get("CID"),
+            smiles=p.get("IsomericSMILES"),
+            inchi=p.get("InChI"),
+            inchikey=p.get("InChIKey"),
+            molecular_weight=float(mw) if mw is not None else None,
+            logp=p.get("XLogP"),
+            h_bond_donors=hbd,
+            h_bond_acceptors=hba,
+            tpsa=p.get("TPSA"),
+            rotatable_bonds=p.get("RotatableBondCount"),
+            lipinski_pass=lipinski,
+            source_plant=None,
+            plant_family=None,
+            created_at=now,
+            updated_at=now,
+        ))
+    return results
+
+
 # ── GET /search ───────────────────────────────────────────────────────────────
 
 @router.get("/search", response_model=list[PhytochemicalOut])
@@ -90,7 +142,17 @@ def search_compounds(
         select(Phytochemical).where(*filters).offset(skip).limit(limit)
     ).all()
 
-    return rows
+    if rows:
+        return rows
+
+    if name:
+        pubchem_results = _search_pubchem(name)
+        if pubchem_results:
+            response.headers["X-Source"] = "pubchem"
+            response.headers["X-Total-Count"] = str(len(pubchem_results))
+            return pubchem_results
+
+    return []
 
 
 # ── GET /stats ────────────────────────────────────────────────────────────────

@@ -45,6 +45,7 @@ def downgrade() -> None:
     op.drop_constraint(None, 'docking_jobs', type_='foreignkey')
     op.drop_index(op.f('ix_docking_jobs_session_id'), table_name='docking_jobs')
     op.drop_column('docking_jobs', 'session_id')
-    op.drop_index(op.f('ix_user_sessions_session_token'), table_name='user_sessions')
+    # op.drop_index(op.f('ix_user_sessions_session_token'), table_name='user_sessions')
+    op.execute("DROP INDEX IF EXISTS uq_phytochemicals_pubchem_cid")
     op.drop_table('user_sessions')
     # ### end Alembic commands ###
