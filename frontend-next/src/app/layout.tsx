@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { Inter, IBM_Plex_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Mono, Geist } from "next/font/google";
 import { Providers } from "@/components/Providers";
 import { TopNav } from "@/components/TopNav";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const inter = Inter({
   variable: "--font-inter",
@@ -30,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${ibmPlexMono.variable} h-full`}
+      className={cn("h-full", inter.variable, ibmPlexMono.variable, "font-sans", geist.variable)}
       suppressHydrationWarning
     >
       <body className="h-full flex flex-col antialiased" suppressHydrationWarning>
