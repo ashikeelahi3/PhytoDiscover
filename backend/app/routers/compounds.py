@@ -164,6 +164,42 @@ def export_csv(
     )
 
 
+# ── GET /plants ───────────────────────────────────────────────────────────────
+
+@router.get("/plants", response_model=list[str])
+def search_plants(
+    q: Optional[str] = Query(None),
+    has_smiles: Optional[bool] = Query(None),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> list[str]:
+    stmt = select(Phytochemical.source_plant).where(
+        Phytochemical.source_plant.isnot(None),
+        Phytochemical.source_plant != ""
+    )
+
+    if q is not None:
+        stmt = stmt.where(Phytochemical.source_plant.ilike(f"%{q}%"))
+
+    if has_smiles is True:
+        stmt = stmt.where(Phytochemical.smiles.isnot(None))
+    elif has_smiles is False:
+        stmt = stmt.where(Phytochemical.smiles.is_(None))
+
+    rows = db.scalars(stmt).all()
+
+    plants = set()
+    for row in rows:
+        for p in row.split(";"):
+            p_clean = p.strip()
+            if p_clean:
+                if q is None or q.lower() in p_clean.lower():
+                    plants.add(p_clean)
+
+    results = sorted(list(plants))
+    return results[:limit]
+
+
 # ── GET /{compound_id} ────────────────────────────────────────────────────────
 # Must be declared last — FastAPI matches routes top-to-bottom and this
 # path pattern would otherwise capture "stats" and "export" as UUIDs.

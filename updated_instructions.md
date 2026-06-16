@@ -95,6 +95,7 @@ cd backend
 pixi run uvicorn app.main:app --host 127.0.0.1 --port 8000
 # Or using standard virtualenv python:
 uvicorn app.main:app --host 127.0.0.1 --port 8000
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload # reload on changes
 ```
 
 ### C. Next.js Frontend
