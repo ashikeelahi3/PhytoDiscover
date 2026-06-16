@@ -68,3 +68,4 @@ def test_results_plants_csv():
         
     finally:
         db.close()
+

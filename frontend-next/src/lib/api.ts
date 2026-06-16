@@ -187,6 +187,11 @@ export function getResultsPlantsCsvUrl(jobId: string): string {
   return `/api/docking/results/${jobId}/plants/csv`;
 }
 
+export function getResultsWorkspaceZipUrl(jobId: string): string {
+  return `/api/docking/results/${jobId}/zip`;
+}
+
+
 
 export async function getPoseFile(resultId: string): Promise<string> {
   const { data } = await api.get<string>(`/api/docking/pose/${resultId}`, {

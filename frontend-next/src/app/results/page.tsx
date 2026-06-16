@@ -12,7 +12,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { getJobs, getJob, getResults, getResultsCsvUrl, getResultsPlantsCsvUrl, getPoseFile } from "@/lib/api";
+import { getJobs, getJob, getResults, getResultsCsvUrl, getResultsPlantsCsvUrl, getResultsWorkspaceZipUrl, getPoseFile } from "@/lib/api";
 import type { DockingJob, Result } from "@/lib/types";
 import { Spinner } from "@/components/ui/Spinner";
 import { StatusBadge } from "@/components/ui/Badge";
@@ -455,6 +455,17 @@ function ResultsPanel({ jobId, proteinCode }: { jobId: string; proteinCode: stri
                   onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
                 >
                   Export Plants
+                </a>
+                <a
+                  href={getResultsWorkspaceZipUrl(jobId)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs px-3 py-1.5 rounded border no-underline font-medium transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text-primary)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+                >
+                  Export Workspace
                 </a>
               </div>
             </div>

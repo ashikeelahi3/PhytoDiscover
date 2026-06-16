@@ -4,6 +4,8 @@ import json
 import logging
 import os
 import uuid as uuid_lib
+import zipfile
+from pathlib import Path
 from uuid import UUID
 
 import redis as redis_lib
@@ -348,6 +350,44 @@ def results_plants_csv(
         media_type="text/csv",
         headers={
             "Content-Disposition": f'attachment; filename="results_plants_{job_id}.csv"'
+        },
+    )
+
+
+# ── GET /results/{job_id}/zip ─────────────────────────────────────────────────
+
+@router.get("/results/{job_id}/zip")
+def results_zip(
+    job_id:  UUID,
+    db:      Session     = Depends(get_db),
+    session: UserSession = Depends(get_current_session),
+) -> StreamingResponse:
+    job = db.get(DockingJob, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    _assert_owns_job(job, session)
+
+    workspace_path = Path(job.pathway)
+    if not workspace_path.exists():
+        raise HTTPException(status_code=404, detail="Workspace directory not found")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for file_path in workspace_path.rglob("*"):
+            # Exclude the misspelled directory and its contents
+            if "protien_pdbqt_files" in file_path.parts:
+                continue
+            if file_path.is_file():
+                relative_path = file_path.relative_to(workspace_path)
+                zip_file.write(file_path, relative_path)
+
+    zip_buffer.seek(0)
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="workspace_{job_id}.zip"'
         },
     )
 
