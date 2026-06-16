@@ -42,3 +42,7 @@ logs/
 # IDE
 .vscode/
 .idea/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+backup
